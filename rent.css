@@ -1,766 +1,1419 @@
-/**
- * Merchant Partners — Gifts Market Mini App
- *
- * Three tabs (Каталог / Замовлення / Профіль) wired to a single backend.
- * Pure ES modules-less code so it runs from any static host (GitHub Pages).
- *
- * Endpoints used (all under window.BACKEND_URL):
- *   GET  /api/rent/gifts                GET  /api/sale/gifts
- *   POST /api/rent/checkout             POST /api/sale/checkout
- *   POST /api/rent/extend
- *   GET  /api/orders                    GET  /api/orders/{id}
- *   POST /api/orders/{id}/confirm       POST /api/orders/{id}/cancel
- *   GET  /health
- */
+/* ╔══════════════════════════════════════════════════════════════╗
+   ║  Gifts Market — Premium Dark UI                               ║
+   ║  Full effects · crimson accent · glassmorphism                ║
+   ╚══════════════════════════════════════════════════════════════╝ */
 
-const BACKEND_URL      = (window.BACKEND_URL || '').replace(/\/$/, '');
-const TON_TO_UAH       = window.TON_TO_UAH || 180;
-const MERCHANT_WALLET  = window.MERCHANT_WALLET || '';
-const tg = window.Telegram?.WebApp ?? null;
+:root {
+    --bg:            #080808;
+    --bg-2:          #0d0d0d;
+    --surface:       #121212;
+    --surface-2:     #191919;
+    --surface-3:     #202020;
+    --surface-hi:    #2a2a2a;
+    --glass:         rgba(18,18,18,0.80);
+    --glass-hi:      rgba(28,28,28,0.90);
 
-function tonToUah(ton) {
-    const uah = Math.round(parseFloat(ton || 0) * TON_TO_UAH);
-    return uah.toLocaleString('uk-UA') + ' ₴';
+    --accent:        #d41115;
+    --accent-2:      #ff2a2e;
+    --accent-3:      #ff5558;
+    --accent-dim:    rgba(212,17,21,0.10);
+    --accent-soft:   rgba(212,17,21,0.18);
+    --accent-border: rgba(212,17,21,0.35);
+    --accent-glow:   rgba(212,17,21,0.55);
+    --accent-glow2:  rgba(212,17,21,0.25);
+
+    --ton:           #4a9eff;
+    --ton-dim:       rgba(74,158,255,0.12);
+    --ton-border:    rgba(74,158,255,0.30);
+    --ton-glow:      rgba(74,158,255,0.40);
+
+    --text:          #f2f2f2;
+    --text-soft:     #c8c8c8;
+    --text-dim:      #888;
+    --text-muted:    #555;
+    --text-faint:    #333;
+
+    --border:        rgba(255,255,255,0.06);
+    --border-hi:     rgba(255,255,255,0.11);
+    --border-glow:   rgba(255,255,255,0.05);
+
+    --green:         #3ddc5e;
+    --green-dim:     rgba(61,220,94,0.12);
+    --orange:        #ff9800;
+    --orange-dim:    rgba(255,152,0,0.12);
+    --blue:          #4a9eff;
+    --purple:        #a259ff;
+    --purple-dim:    rgba(162,89,255,0.12);
+
+    --radius:        18px;
+    --radius-sm:     12px;
+    --radius-lg:     24px;
+    --radius-xl:     32px;
+
+    --safe-bottom:   env(safe-area-inset-bottom, 0);
+    --nav-h:         70px;
+    --font:          'Outfit', system-ui, -apple-system, sans-serif;
+
+    --ease-spring:   cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-out:      cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-in-out:   cubic-bezier(0.65, 0, 0.35, 1);
 }
 
-if (tg) {
-    tg.ready();
-    tg.expand();
-    tg.setHeaderColor?.('#0a0a0a');
-    tg.setBackgroundColor?.('#0a0a0a');
-    tg.enableClosingConfirmation?.();
+*, *::before, *::after {
+    margin: 0; padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
 }
 
-// ─── TonConnect ─────────────────────────────────────────────────────────────
+html { scroll-behavior: smooth; }
 
-let tonConnectUI = null;
-try {
-    if (window.TON_CONNECT_UI) {
-        tonConnectUI = new window.TON_CONNECT_UI.TonConnectUI({
-            manifestUrl: window.TONCONNECT_MANIFEST,
-            buttonRootId: 'ton-connect',
-        });
-        tonConnectUI.onStatusChange?.(refreshWalletUi);
-    }
-} catch (e) {
-    console.warn('TonConnect init failed:', e);
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+    overscroll-behavior-y: none;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: calc(var(--nav-h) + var(--safe-bottom));
+    background-image:
+        radial-gradient(ellipse 80% 40% at 50% 0%, rgba(212,17,21,0.05) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 30% at 20% 100%, rgba(74,158,255,0.03) 0%, transparent 50%);
+    background-attachment: fixed;
 }
 
-// ─── State ──────────────────────────────────────────────────────────────────
+.view { max-width: 480px; margin: 0 auto; }
+.hidden { display: none !important; }
 
-const state = {
-    tab: 'catalog',                  // catalog | orders | settings
-    mode: 'rent',                    // rent | sale
-    sort: 'popular',
-    method: 'tonconnect',            // tonconnect | stars
-    query: '',
-    items: [],
-    cursor: null,
-    hasMore: false,
-    loading: false,
-    selected: null,
-    duration: 7,
-    ordersKind: '',                  // '' | 'rent' | 'sale'
-};
+/* ╭──────────────────── Header ────────────────────╮ */
 
-// ─── DOM helpers ────────────────────────────────────────────────────────────
-
-const $  = (id) => document.getElementById(id);
-const $$ = (sel) => document.querySelectorAll(sel);
-
-function esc(s) {
-    return String(s ?? '').replace(/[&<>"']/g, (c) =>
-        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+.r-header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: rgba(8,8,8,0.88);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    padding: 14px 16px 0;
+    border-bottom: 1px solid var(--border);
 }
 
-function pluralDays(n) {
-    n = Math.abs(n);
-    if (n === 1) return 'день';
-    if (n >= 2 && n <= 4) return 'дні';
-    return 'днів';
+.r-header.simple { padding-bottom: 14px; }
+
+.r-header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    gap: 8px;
 }
 
-function truncAddr(a) {
-    if (!a) return '';
-    return a.length > 14 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a;
+.r-brand { display: flex; align-items: center; gap: 10px; }
+
+.r-dot {
+    position: relative;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 0 var(--accent-glow);
+    animation: pulse-dot 2.2s infinite;
+}
+.r-dot::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0;
+    animation: pulse-ring 2.2s infinite;
 }
 
-// ─── API ────────────────────────────────────────────────────────────────────
-
-function authHeaders() {
-    const h = { 'Content-Type': 'application/json' };
-    if (tg?.initData) h['X-Telegram-Init-Data'] = tg.initData;
-    return h;
+@keyframes pulse-dot {
+    0%,100%  { box-shadow: 0 0 6px 2px var(--accent-glow2); }
+    50%      { box-shadow: 0 0 16px 5px var(--accent-glow); }
+}
+@keyframes pulse-ring {
+    0%   { transform: scale(1);   opacity: 0.4; }
+    80%  { transform: scale(2.4); opacity: 0; }
+    100% { transform: scale(2.4); opacity: 0; }
 }
 
-async function api(path, options = {}) {
-    if (!BACKEND_URL) {
-        throw new Error('BACKEND_URL не задано — додайте window.BACKEND_URL у rent.html');
-    }
-    const res = await fetch(`${BACKEND_URL}${path}`, {
-        ...options,
-        headers: { ...authHeaders(), ...(options.headers || {}), 'ngrok-skip-browser-warning': '1' },
-    });
-    let body = {};
-    try { body = await res.json(); } catch { /* may be empty */ }
-    if (!res.ok) {
-        const msg = body?.error?.message || body?.detail || `HTTP ${res.status}`;
-        const err = new Error(msg);
-        err.code = body?.error?.code;
-        err.status = res.status;
-        throw err;
-    }
-    return body;
+.r-title {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    line-height: 1;
 }
 
-// ─── Toasts ─────────────────────────────────────────────────────────────────
-
-function toast(message, kind = 'info', durationMs = 3500) {
-    const ic = { success: '✅', error: '⚠️', info: '💬' }[kind] || '💬';
-    const t = document.createElement('div');
-    t.className = `toast ${kind}`;
-    t.innerHTML = `<span class="toast-ic">${ic}</span><span>${esc(message)}</span>`;
-    $('toasts').appendChild(t);
-    setTimeout(() => {
-        t.style.transition = 'opacity 0.25s, transform 0.25s';
-        t.style.opacity = '0';
-        t.style.transform = 'translateY(10px)';
-        setTimeout(() => t.remove(), 260);
-    }, durationMs);
+.accent {
+    color: var(--accent);
+    text-shadow: 0 0 20px var(--accent-glow), 0 0 40px var(--accent-glow2);
 }
 
-function notify(msg, kind = 'info') {
-    // Use Telegram's native dialog only for genuine errors that need attention.
-    if (tg && kind === 'error') tg.showAlert(msg);
-    else toast(msg, kind);
+.ton-connect-slot { display: flex; align-items: center; min-height: 32px; }
+
+/* ╭──────────────────── Search ────────────────────╮ */
+
+.r-search-wrap { position: relative; margin-bottom: 10px; }
+
+.r-search-ic {
+    position: absolute;
+    left: 13px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
 }
 
-// ─── Catalog ────────────────────────────────────────────────────────────────
-
-async function loadItems(reset = false) {
-    if (state.loading) return;
-    state.loading = true;
-
-    if (reset) {
-        state.items = [];
-        state.cursor = null;
-        renderSkeletons();
-    }
-
-    const params = new URLSearchParams({ sort: state.sort });
-    if (state.cursor) params.set('cursor', state.cursor);
-    const endpoint = state.mode === 'rent' ? '/api/rent/gifts' : '/api/sale/gifts';
-
-    try {
-        const data = await api(`${endpoint}?${params}`);
-        state.items.push(...(data.items || []));
-        state.cursor = data.cursor || null;
-        state.hasMore = !!state.cursor;
-        renderGrid();
-    } catch (e) {
-        renderError(e.message);
-    } finally {
-        state.loading = false;
-        $('load-more-container').style.display = state.hasMore ? 'flex' : 'none';
-    }
+#search-input {
+    width: 100%;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 11px 14px 11px 38px;
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
 }
 
-function renderSkeletons() {
-    $('gifts-grid').innerHTML = Array(6).fill('<div class="gift-skeleton"></div>').join('');
+#search-input:focus {
+    border-color: var(--accent-border);
+    background: var(--surface-3);
+    box-shadow: 0 0 0 3px var(--accent-dim), inset 0 0 0 1px var(--accent-border);
 }
 
-function visibleItems() {
-    const q = state.query.trim().toLowerCase();
-    if (!q) return state.items;
-    return state.items.filter((g) =>
-        (g.name || '').toLowerCase().includes(q) ||
-        (g.nft_address || '').toLowerCase().includes(q));
+#search-input::placeholder { color: var(--text-faint); }
+
+/* ╭──────────────────── Mode tabs ────────────────────╮ */
+
+.r-tabs {
+    display: flex;
+    gap: 5px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 4px;
+    margin-bottom: 12px;
+    position: relative;
 }
 
-function renderGrid() {
-    const grid = $('gifts-grid');
-    const items = visibleItems();
-    if (!items.length) {
-        grid.innerHTML = stateCell(
-            '🎁',
-            state.query ? 'Нічого не знайдено' : 'Каталог поки порожній',
-            state.query ? `За запитом «${esc(state.query)}» немає результатів` : 'Спробуйте інший фільтр',
-        );
-        return;
-    }
-    grid.innerHTML = items.map((g, i) =>
-        state.mode === 'rent' ? rentCard(g, i) : saleCard(g, i)).join('');
-    grid.querySelectorAll('.gift-card').forEach((card) => {
-        const idx = +card.dataset.idx;
-        card.addEventListener('click', () => openModal(items[idx]));
-    });
+.r-tab {
+    flex: 1;
+    padding: 9px 0;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--font);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.22s var(--ease-out), color 0.22s, box-shadow 0.22s;
+    position: relative;
+    z-index: 1;
 }
 
-function imgMarkup(g) {
-    return g.image_url
-        ? `<img class="gift-card-img" src="${esc(g.image_url)}" alt="${esc(g.name)}" loading="lazy"
-             onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'gift-card-placeholder',textContent:'🎁'}))">`
-        : `<div class="gift-card-placeholder">🎁</div>`;
+.r-tab.active {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 2px 16px var(--accent-glow), 0 1px 4px rgba(0,0,0,0.4);
 }
 
-function rentCard(g, i) {
-    const uahPerDay = tonToUah(g.price_per_day_ton);
-    return `
-        <div class="gift-card" data-idx="${i}" role="button" tabindex="0" style="--i:${i}">
-            <div class="gift-card-img-wrap">
-                ${imgMarkup(g)}
-                <div class="gift-card-img-overlay"></div>
-                <div class="gift-card-img-glow"></div>
-                <div class="gift-card-days-badge">📅 ${g.min_duration_days}–${g.max_duration_days}д</div>
-                <div class="gift-card-ton-badge">💎 ${g.price_per_day_ton}</div>
-                <div class="gift-card-over">
-                    <div class="gift-card-name">${esc(g.name)}</div>
-                    <div class="gift-card-price-row">
-                        <span class="gift-card-ton">💎 ${g.price_per_day_ton}<span class="cur-label">TON/д</span></span>
-                        <span class="gift-card-uah">${uahPerDay}</span>
-                    </div>
-                </div>
-            </div>
-            <button class="gift-card-rent-btn" tabindex="-1"><span>Орендувати</span></button>
-        </div>`;
+/* ╭──────────────────── Filter chips ────────────────────╮ */
+
+.r-filters {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 12px;
+    scrollbar-width: none;
+}
+.r-filters::-webkit-scrollbar { display: none; }
+
+.filter-chip {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--font);
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.18s;
+    white-space: nowrap;
 }
 
-function saleCard(g, i) {
-    const cur = g.currency || 'TON';
-    const uah = tonToUah(g.price_with_markup);
-    return `
-        <div class="gift-card" data-idx="${i}" role="button" tabindex="0" style="--i:${i}">
-            <div class="gift-card-img-wrap">
-                ${imgMarkup(g)}
-                <div class="gift-card-img-overlay"></div>
-                <div class="gift-card-img-glow"></div>
-                <div class="gift-card-ton-badge">💎 ${g.price_with_markup}</div>
-                <div class="gift-card-over">
-                    <div class="gift-card-name">${esc(g.name)}</div>
-                    <div class="gift-card-price-row">
-                        <span class="gift-card-ton">💎 ${g.price_with_markup}<span class="cur-label">${esc(cur)}</span></span>
-                        <span class="gift-card-uah">${uah}</span>
-                    </div>
-                </div>
-            </div>
-            <button class="gift-card-rent-btn" tabindex="-1"><span>Купити</span></button>
-        </div>`;
+.filter-chip.active {
+    background: var(--accent-dim);
+    border-color: var(--accent-border);
+    color: var(--accent-3);
+    box-shadow: 0 0 12px var(--accent-dim);
 }
 
-function stateCell(icon, title, desc, withRetry = false) {
-    return `
-        <div class="state-cell">
-            <div class="state-icon">${icon}</div>
-            <div class="state-title">${esc(title)}</div>
-            <div class="state-desc">${esc(desc)}</div>
-            ${withRetry ? '<button class="state-btn" onclick="window.__reload()">Спробувати знову</button>' : ''}
-        </div>`;
+.filter-chip:hover:not(.active) {
+    background: var(--surface-3);
+    border-color: var(--border-hi);
+    color: var(--text-soft);
 }
 
-function renderError(msg) {
-    $('gifts-grid').innerHTML = stateCell('⚠️', 'Помилка завантаження', msg || 'Перевірте з\'єднання', true);
-}
-window.__reload = () => loadItems(true);
+/* ╭──────────────────── Gift grid ────────────────────╮ */
 
-// ─── Modal ──────────────────────────────────────────────────────────────────
-
-function openModal(item) {
-    state.selected = item;
-    const isRent = state.mode === 'rent';
-
-    $('modal-img').src = item.image_url || '';
-    $('modal-name').textContent = item.name || 'Подарунок';
-    $('modal-addr').textContent = truncAddr(item.nft_address);
-
-    $('duration-section').style.display = isRent ? 'block' : 'none';
-
-    if (isRent) {
-        state.duration = item.min_duration_days || 1;
-        $('modal-ppd-stars').textContent = `💎 ${item.price_per_day_ton} TON`;
-        $('modal-ppd-label').textContent = '/ день';
-        const sl = $('duration-slider');
-        sl.min = item.min_duration_days || 1;
-        sl.max = item.max_duration_days || 30;
-        sl.value = state.duration;
-        updateSliderFill(sl);
-        $('duration-min-label').textContent = `${item.min_duration_days} дн`;
-        $('duration-max-label').textContent = `${item.max_duration_days} дн`;
-    } else {
-        $('modal-ppd-stars').textContent = `💎 ${item.price_with_markup} ${item.currency || 'TON'}`;
-        $('modal-ppd-label').textContent = 'ціна';
-    }
-
-    $('rent-btn-text').textContent = isRent ? 'Орендувати' : 'Купити';
-    refreshTotals();
-    $('rental-modal').hidden = false;
-
-    if (tg) {
-        tg.HapticFeedback?.impactOccurred('light');
-        tg.BackButton.show();
-        tg.BackButton.onClick(closeModal);
-    }
+.r-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    padding: 16px;
 }
 
-function closeModal() {
-    $('rental-modal').hidden = true;
-    state.selected = null;
-    hideModalError();
-    setRentBtnLoading(false);
-    if (tg) tg.BackButton.hide();
+/* ╭──────────────────── Gift card ────────────────────╮ */
+
+.gift-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    cursor: pointer;
+    transition:
+        transform 0.18s var(--ease-out),
+        border-color 0.22s,
+        box-shadow 0.22s;
+    user-select: none;
+    animation: card-in 0.42s var(--ease-out) both;
+    position: relative;
 }
 
-function showModalError(title, desc) {
-    const box = $('modal-error');
-    if (!box) return;
-    $('modal-error-title').textContent = title || 'Не вдалося оформити';
-    $('modal-error-desc').textContent = desc || '';
-    box.hidden = false;
-    // Re-trigger shake animation if shown again
-    box.style.animation = 'none';
-    void box.offsetWidth;
-    box.style.animation = '';
+.gift-card:nth-child(odd)  { animation-delay: calc(var(--i, 0) * 60ms); }
+.gift-card:nth-child(even) { animation-delay: calc(var(--i, 0) * 60ms + 30ms); }
+
+@keyframes card-in {
+    from { opacity: 0; transform: translateY(18px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0)    scale(1); }
 }
 
-function hideModalError() {
-    const box = $('modal-error');
-    if (box) box.hidden = true;
+.gift-card:active { transform: scale(0.95); }
+
+.gift-card:hover {
+    border-color: var(--accent-border);
+    box-shadow:
+        0 0 0 1px var(--accent-border),
+        0 8px 32px rgba(0,0,0,0.6),
+        0 0 40px var(--accent-dim);
 }
 
-function setRentBtnLoading(on, text) {
-    const btn = $('rent-btn');
-    if (!btn) return;
-    btn.disabled = !!on;
-    btn.classList.toggle('loading', !!on);
-    if (text) $('rent-btn-text').textContent = text;
+/* shine sweep on hover */
+.gift-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        115deg,
+        transparent 40%,
+        rgba(255,255,255,0.06) 50%,
+        transparent 60%
+    );
+    transform: translateX(-100%);
+    transition: transform 0s;
+    pointer-events: none;
+    border-radius: var(--radius);
+    z-index: 10;
+}
+.gift-card:hover::after {
+    transform: translateX(200%);
+    transition: transform 0.55s ease;
 }
 
-function refreshTotals() {
-    const g = state.selected;
-    if (!g) return;
-
-    const sec = document.querySelector('.total-section');
-    if (sec) {
-        sec.classList.remove('bump');
-        void sec.offsetWidth;
-        sec.classList.add('bump');
-    }
-
-    if (state.mode === 'rent') {
-        const days = state.duration;
-        let total = g.price_per_day_ton * days;
-        if (days > 1 && g.discount_per_day) total *= (1 - g.discount_per_day);
-        total = Math.round(total * 1000) / 1000;
-        $('duration-display').textContent = `${days} ${pluralDays(days)}`;
-        $('total-ton').textContent = `💎 ${total} TON`;
-        $('total-stars').textContent = `≈ ${tonToUah(total)}`;
-
-        const dr = $('discount-row');
-        if (days > 1 && g.discount_per_day) {
-            $('discount-text').textContent = `🎉 Знижка ${Math.round(g.discount_per_day * 100)}% враховано`;
-            dr.style.display = 'block';
-        } else dr.style.display = 'none';
-    } else {
-        $('total-ton').textContent = `💎 ${g.price_with_markup} ${g.currency || 'TON'}`;
-        $('total-stars').textContent = `≈ ${tonToUah(g.price_with_markup)}`;
-        $('discount-row').style.display = 'none';
-    }
+/* image wrap */
+.gift-card-img-wrap {
+    position: relative;
+    width: 100%;
+    padding-top: 118%;
+    background: linear-gradient(145deg, #161616, #1e1e1e);
+    overflow: hidden;
 }
 
-function updateSliderFill(sl) {
-    const min = +sl.min, max = +sl.max, val = +sl.value;
-    const pct = max > min ? ((val - min) / (max - min)) * 100 : 0;
-    sl.style.background =
-        `linear-gradient(to right, var(--accent) 0%, var(--accent) ${pct}%, var(--surface-3) ${pct}%, var(--surface-3) 100%)`;
+.gift-card-img {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s var(--ease-out), filter 0.5s;
 }
 
-// ─── Checkout ───────────────────────────────────────────────────────────────
-
-async function checkout() {
-    const g = state.selected;
-    if (!g) return;
-
-    const btn = $('rent-btn');
-    const original = state.mode === 'rent' ? 'Орендувати' : 'Купити';
-    hideModalError();
-    setRentBtnLoading(true, 'Створюємо замовлення…');
-    if (tg) tg.HapticFeedback?.impactOccurred('medium');
-
-    try {
-        const endpoint = state.mode === 'rent' ? '/api/rent/checkout' : '/api/sale/checkout';
-        const body = state.mode === 'rent'
-            ? { nft_address: g.nft_address, duration_days: state.duration, method: state.method }
-            : { nft_address: g.nft_address, method: state.method };
-        const resp = await api(endpoint, { method: 'POST', body: JSON.stringify(body) });
-
-        if (resp.method === 'stars') {
-            await payWithStars(resp, g, btn, original);
-        } else {
-            await payWithTon(resp, g, btn, original);
-        }
-    } catch (e) {
-        console.error('Checkout failed:', e);
-        setRentBtnLoading(false, original);
-        showCheckoutError(e);
-        if (tg) tg.HapticFeedback?.notificationOccurred('error');
-    }
+.gift-card:hover .gift-card-img {
+    transform: scale(1.08);
+    filter: brightness(1.05);
 }
 
-function showCheckoutError(e) {
-    const status = e.status || 0;
-    const msg = e.message || 'Сталася невідома помилка';
-    let title = 'Не вдалося оформити';
-    let desc  = msg;
-
-    if (status === 401 || /init data|telegram/i.test(msg)) {
-        title = 'Потрібен Telegram';
-        desc  = 'Відкрийте Mini App через бота — без Telegram авторизації оформити неможливо.';
-    } else if (status === 404 || /no longer|unavailable|недост/i.test(msg)) {
-        title = 'Подарунок щойно став недоступним';
-        desc  = 'Імовірно його вже орендували. Поверніться до каталогу і оновіть список.';
-    } else if (status === 429 || /rate|обмежує/i.test(msg)) {
-        title = 'Забагато запитів';
-        desc  = 'Зачекайте 10-20 секунд і спробуйте знову.';
-    } else if (status === 502 || /marketapp|upstream/i.test(msg)) {
-        title = 'Помилка MarketApp';
-        desc  = msg;
-    } else if (/fetch|network|backend_url/i.test(msg)) {
-        title = 'Немає зв\'язку з бекендом';
-        desc  = 'Перевірте, що ngrok-тунель запущено і BACKEND_URL у rent.html актуальний.';
-    }
-    showModalError(title, desc);
+.gift-card-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 52px;
+    background: radial-gradient(circle at 50% 60%, #1e1e1e, #111);
 }
 
-function showTopupHint(show) {
-    const hint = $('topup-hint');
-    if (!hint) return;
-    hint.style.display = show ? 'block' : 'none';
-    if (show && MERCHANT_WALLET) {
-        $('topup-addr').textContent = MERCHANT_WALLET;
-    }
+/* gradient overlay */
+.gift-card-img-overlay {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 75%;
+    background: linear-gradient(
+        to top,
+        rgba(0,0,0,0.97) 0%,
+        rgba(0,0,0,0.72) 35%,
+        rgba(0,0,0,0.30) 65%,
+        transparent 100%
+    );
+    pointer-events: none;
 }
 
-async function payWithTon(resp, g, btn, original) {
-    if (!tonConnectUI) {
-        setRentBtnLoading(false, original);
-        showTopupHint(true);
-        showModalError('Підключіть TON-гаманець', 'TonConnect не ініціалізувався — оновіть сторінку.');
-        return;
-    }
-    if (!tonConnectUI.connected) {
-        setRentBtnLoading(false, original);
-        showTopupHint(true);
-        showModalError('Гаманець не підключено', 'Натисніть «Підключити гаманець» вгорі сторінки, потім повторіть оплату.');
-        await tonConnectUI.openModal();
-        return;
-    }
-    showTopupHint(false);
-    setRentBtnLoading(true, 'Підпишіть транзакцію в гаманці…');
-    let result;
-    try {
-        result = await tonConnectUI.sendTransaction({
-            validUntil: resp.transaction.valid_until || Math.floor(Date.now() / 1000) + 300,
-            messages: resp.transaction.messages.map((m) => ({
-                address: m.address,
-                amount: m.amount,
-                payload: m.payload || undefined,
-                stateInit: m.stateInit || undefined,
-            })),
-        });
-    } catch (e) {
-        setRentBtnLoading(false, original);
-        if (!/reject|cancel/i.test(e?.message || '')) {
-            showModalError('Транзакцію не підтверджено', e?.message || 'Гаманець відхилив підпис.');
-        }
-        return;
-    }
+/* corner glow on hover */
+.gift-card-img-glow {
+    position: absolute;
+    bottom: 0; left: 0; right: 0; height: 50%;
+    background: linear-gradient(to top, var(--accent-dim), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+}
+.gift-card:hover .gift-card-img-glow { opacity: 1; }
 
-    setRentBtnLoading(true, 'Підтвердження в мережі TON…');
-    const wallet = tonConnectUI.account?.address || null;
-    try {
-        await api(`/api/orders/${resp.order_id}/confirm`, {
-            method: 'POST',
-            body: JSON.stringify({ boc: result?.boc || null, wallet_address: wallet }),
-        });
-    } catch (e) {
-        console.warn('confirm submit failed, will still poll:', e);
-    }
-    const ok = await pollOrder(resp.order_id);
-    if (ok) {
-        closeModal();
-        showSuccess(g);
-    } else {
-        setRentBtnLoading(false, original);
-        notify('Транзакцію надіслано. Дочекайтеся підтвердження в «Замовленнях».', 'info');
-        closeModal();
-        setTab('orders');
-    }
+/* content overlay */
+.gift-card-over {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 10px 10px 9px;
 }
 
-async function payWithStars(resp, g, btn, original) {
-    if (tg && resp.invoice_link) {
-        tg.openInvoice(resp.invoice_link, async (status) => {
-            if (status === 'paid') {
-                setRentBtnLoading(true, 'Видача подарунка…');
-                const ok = await pollOrder(resp.order_id);
-                if (ok) {
-                    closeModal();
-                    showSuccess(g);
-                } else {
-                    setRentBtnLoading(false, original);
-                    notify('Оплату отримано — видача обробляється', 'info');
-                }
-            } else {
-                setRentBtnLoading(false, original);
-                if (status !== 'cancelled') showModalError('Оплата не пройшла', 'Telegram повідомив про збій оплати Stars.');
-            }
-        });
-    } else {
-        setRentBtnLoading(false, original);
-        showModalError('Stars недоступні', 'Stars-оплата доступна лише всередині Telegram Mini App.');
-    }
+/* duration badge top-left */
+.gift-card-days-badge {
+    position: absolute;
+    top: 8px; left: 8px;
+    background: rgba(0,0,0,0.68);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 8px;
+    padding: 3px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.80);
+    letter-spacing: 0.3px;
 }
 
-async function pollOrder(orderId, { tries = 30, intervalMs = 3000 } = {}) {
-    for (let i = 0; i < tries; i++) {
-        try {
-            const s = await api(`/api/orders/${orderId}`);
-            if (s.status === 'fulfilled') return true;
-            if (s.status === 'failed' || s.status === 'expired') return false;
-        } catch { /* transient — keep polling */ }
-        await new Promise((r) => setTimeout(r, intervalMs));
-    }
-    return false;
+/* TON badge top-right */
+.gift-card-ton-badge {
+    position: absolute;
+    top: 8px; right: 8px;
+    background: rgba(74,158,255,0.18);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(74,158,255,0.30);
+    border-radius: 8px;
+    padding: 3px 8px;
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--ton);
+    letter-spacing: 0.2px;
 }
 
-function resetBtn(btn, text) {
-    setRentBtnLoading(false, text);
+.gift-card-name {
+    font-size: 12.5px;
+    font-weight: 700;
+    line-height: 1.3;
+    margin-bottom: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #fff;
+    text-shadow: 0 1px 8px rgba(0,0,0,0.95), 0 0 20px rgba(0,0,0,0.6);
 }
 
-function showSuccess(g) {
-    const isRent = state.mode === 'rent';
-    $('success-title').textContent = isRent ? 'Оренду оформлено!' : 'Покупку оформлено!';
-    $('success-desc').textContent = isRent
-        ? `"${g.name}" орендовано на ${state.duration} ${pluralDays(state.duration)}. Подарунок вже на вашому акаунті!`
-        : `"${g.name}" придбано. Подарунок зараховано на ваш акаунт!`;
-    $('success-screen').hidden = false;
-    if (tg) { tg.HapticFeedback?.notificationOccurred('success'); tg.BackButton.hide(); }
+.gift-card-price-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
 }
 
-function closeSuccess() {
-    $('success-screen').hidden = true;
-    loadItems(true);
+.gift-card-ton {
+    font-size: 13px;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.9);
+    display: flex;
+    align-items: baseline;
+    gap: 3px;
+}
+.gift-card-ton .cur-label {
+    font-size: 9px;
+    opacity: 0.7;
+    font-weight: 600;
 }
 
-// ─── Orders view ────────────────────────────────────────────────────────────
-
-const STATUS_LABEL = {
-    created: 'створено',
-    awaiting_signature: 'очікує підпису',
-    invoiced: 'очікує оплати',
-    submitted: 'надіслано',
-    confirming: 'підтвердження',
-    paid: 'оплачено',
-    fulfilled: 'виконано',
-    paid_unfulfilled: 'оплачено · видача вручну',
-    failed: 'скасовано',
-    expired: 'термін минув',
-};
-
-async function loadOrders() {
-    const list = $('orders-list');
-    list.innerHTML = '<div class="gift-skeleton wide"></div><div class="gift-skeleton wide"></div><div class="gift-skeleton wide"></div>';
-    try {
-        const qs = state.ordersKind ? `?kind=${state.ordersKind}` : '';
-        const orders = await api(`/api/orders${qs}`);
-        if (!orders.length) {
-            list.innerHTML = stateCell('📭', 'Поки немає замовлень', 'Замовляйте подарунки в «Каталозі»');
-            return;
-        }
-        list.innerHTML = orders.map(orderCard).join('');
-        list.querySelectorAll('.order-cancel-btn').forEach((b) => {
-            b.addEventListener('click', () => cancelOrder(+b.dataset.id));
-        });
-    } catch (e) {
-        list.innerHTML = stateCell('⚠️', 'Помилка', e.message, false);
-    }
+.gift-card-uah {
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.55);
+    line-height: 1;
 }
 
-function orderCard(o) {
-    const dur = o.kind === 'rent' && o.duration_days ? ` · ${o.duration_days} ${pluralDays(o.duration_days)}` : '';
-    const cancelBtn = o.can_cancel
-        ? `<button class="order-cancel-btn" data-id="${o.order_id}">скасувати</button>`
-        : '';
-    const imgContent = o.image_url
-        ? `<img src="${esc(o.image_url)}" alt="" loading="lazy" onerror="this.textContent='${o.kind === 'rent' ? '🎁' : '🛒'}';this.style.fontSize='28px'">`
-        : (o.kind === 'rent' ? '🎁' : '🛒');
-    const uahPrice = o.currency !== 'XTR' ? `<span style="font-size:11px;color:var(--text-muted);margin-left:4px">≈ ${tonToUah(o.our_price)}</span>` : '';
-    return `
-        <div class="order-card">
-            <div class="order-img">${imgContent}</div>
-            <div class="order-info">
-                <div class="order-name">${esc(o.nft_name || 'Подарунок')}</div>
-                <div class="order-meta">${esc(o.kind === 'rent' ? 'Оренда' : 'Купівля')}${dur} · ${esc(truncAddr(o.nft_address))}</div>
-                <div class="order-bottom">
-                    <span class="badge badge-${esc(o.status)}">${STATUS_LABEL[o.status] || o.status}</span>
-                    <div style="display:flex;align-items:center;gap:4px;">
-                        <span class="order-price">💎 ${o.our_price}${o.currency === 'XTR' ? ' ⭐' : ''}</span>
-                        ${uahPrice}
-                        ${cancelBtn}
-                    </div>
-                </div>
-            </div>
-        </div>`;
+.gift-card-rent-btn {
+    display: block;
+    width: 100%;
+    padding: 9px 0;
+    background: linear-gradient(180deg, var(--accent-soft) 0%, var(--accent-dim) 100%);
+    border: none;
+    border-top: 1px solid var(--accent-border);
+    border-radius: 0 0 var(--radius) var(--radius);
+    color: var(--text-soft);
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 700;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+    letter-spacing: 0.3px;
+    position: relative;
+    overflow: hidden;
 }
 
-async function cancelOrder(id) {
-    try {
-        await api(`/api/orders/${id}/cancel`, { method: 'POST' });
-        notify('Замовлення скасовано', 'success');
-        loadOrders();
-    } catch (e) {
-        notify(e.message, 'error');
-    }
+.gift-card-rent-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, var(--accent) 0%, #b00d10 100%);
+    opacity: 0;
+    transition: opacity 0.22s;
+}
+.gift-card-rent-btn:hover::before { opacity: 1; }
+.gift-card-rent-btn:hover {
+    color: #fff;
+    box-shadow: 0 -2px 16px var(--accent-glow2);
+}
+.gift-card-rent-btn span { position: relative; z-index: 1; }
+
+/* heart / wishlist micro-affordance (future use) */
+.gift-card-heart {
+    position: absolute;
+    top: 8px; right: 8px;
+    display: none;
 }
 
-// ─── Settings view ──────────────────────────────────────────────────────────
+/* ╭──────────────────── Skeleton ────────────────────╮ */
 
-async function loadSettings() {
-    const user = tg?.initDataUnsafe?.user;
-    if (user) {
-        $('user-name').textContent = user.first_name + (user.last_name ? ` ${user.last_name}` : '');
-        $('user-uid').textContent = user.username ? `@${user.username}` : `id ${user.id}`;
-        $('user-avatar').textContent = (user.first_name || '?').charAt(0).toUpperCase();
-    }
-    refreshWalletUi();
-
-    try {
-        const h = await api('/health');
-        $('net-info').textContent = h.network === 'testnet' ? 'TON Testnet' : 'TON Mainnet';
-        $('markup-info').textContent = `~${h.markup_percent}%`;
-    } catch { /* ignore */ }
+.gift-skeleton {
+    border-radius: var(--radius);
+    height: 240px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    position: relative;
+    background: var(--surface);
 }
 
-function refreshWalletUi() {
-    const btn = $('wallet-action-btn');
-    const status = $('wallet-status');
-    if (tonConnectUI?.connected) {
-        const addr = tonConnectUI.account?.address;
-        status.textContent = truncAddr(addr);
-        status.style.color = 'var(--green)';
-        btn.textContent = 'Від\'єднати гаманець';
-        btn.classList.add('disconnect');
-    } else {
-        status.textContent = 'не підключено';
-        status.style.color = '';
-        btn.textContent = 'Підключити гаманець';
-        btn.classList.remove('disconnect');
-    }
+.gift-skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        110deg,
+        transparent 25%,
+        rgba(255,255,255,0.04) 50%,
+        transparent 75%
+    );
+    background-size: 200% 100%;
+    animation: skel 1.5s linear infinite;
 }
 
-async function toggleWallet() {
-    if (!tonConnectUI) return notify('TonConnect недоступний', 'error');
-    if (tonConnectUI.connected) await tonConnectUI.disconnect();
-    else                       await tonConnectUI.openModal();
+.gift-skeleton.wide {
+    height: 84px;
+    margin: 0 16px 12px;
 }
 
-// ─── Tabs ──────────────────────────────────────────────────────────────────
-
-function setTab(tab) {
-    state.tab = tab;
-    document.body.dataset.tab = tab;
-    $$('.view').forEach((v) => v.classList.toggle('hidden', v.dataset.view !== tab));
-    $$('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
-
-    if (tab === 'orders') loadOrders();
-    else if (tab === 'settings') loadSettings();
-    if (tg) tg.HapticFeedback?.selectionChanged();
+@keyframes skel {
+    from { background-position: 200% 0; }
+    to   { background-position: -200% 0; }
 }
 
-function setMode(mode) {
-    state.mode = mode;
-    state.sort = mode === 'rent' ? 'popular' : 'price_asc';
-    $$('.r-tabs [data-mode]').forEach((t) => t.classList.toggle('active', t.dataset.mode === mode));
-    $$('.rent-only').forEach((e) => e.style.display = mode === 'rent' ? '' : 'none');
-    $$('.filter-chip').forEach((c) => c.classList.toggle('active', c.dataset.sort === state.sort));
-    loadItems(true);
+/* ╭──────────────────── Load more ────────────────────╮ */
+
+.r-load-more { display: flex; justify-content: center; padding: 4px 16px 16px; }
+
+.load-more-btn {
+    padding: 11px 32px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-hi);
+    border-radius: 20px;
+    color: var(--text-dim);
+    font-family: var(--font);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
 }
 
-// ─── Wire up ────────────────────────────────────────────────────────────────
+.load-more-btn:hover {
+    border-color: var(--accent-border);
+    color: var(--text);
+    box-shadow: 0 0 16px var(--accent-dim);
+}
 
-$('rental-modal').addEventListener('click', (e) => {
-    if (e.target === $('rental-modal')) closeModal();
-});
+/* ╭──────────────────── State cells ────────────────────╮ */
 
-$('duration-slider').addEventListener('input', (e) => {
-    state.duration = parseInt(e.target.value, 10);
-    updateSliderFill(e.target);
-    refreshTotals();
-    if (tg) tg.HapticFeedback?.selectionChanged();
-});
+.state-cell {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 60px 24px;
+    gap: 12px;
+    text-align: center;
+}
 
-$('rent-btn').addEventListener('click', checkout);
-$('success-btn').addEventListener('click', closeSuccess);
-$('load-more-btn').addEventListener('click', () => loadItems(false));
-$('wallet-action-btn').addEventListener('click', toggleWallet);
-$('modal-error-close')?.addEventListener('click', hideModalError);
-$('topup-copy-btn').addEventListener('click', () => {
-    const addr = MERCHANT_WALLET;
-    if (!addr) return;
-    navigator.clipboard?.writeText(addr).then(() => {
-        notify('Адресу скопійовано', 'success');
-        if (tg) tg.HapticFeedback?.notificationOccurred('success');
-    }).catch(() => {
-        const el = document.createElement('input');
-        el.value = addr; document.body.appendChild(el);
-        el.select(); document.execCommand('copy');
-        document.body.removeChild(el);
-        notify('Адресу скопійовано', 'success');
-    });
-});
+.state-icon  { font-size: 52px; animation: float 3s ease-in-out infinite; }
+@keyframes float {
+    0%,100% { transform: translateY(0); }
+    50%     { transform: translateY(-8px); }
+}
 
-$$('.r-tabs [data-mode]').forEach((t) =>
-    t.addEventListener('click', () => setMode(t.dataset.mode)));
+.state-title { font-size: 17px; font-weight: 700; }
+.state-desc  { font-size: 13px; color: var(--text-dim); line-height: 1.55; max-width: 240px; }
 
-$$('.filter-chip').forEach((chip) =>
-    chip.addEventListener('click', () => {
-        $$('.filter-chip').forEach((c) => c.classList.remove('active'));
-        chip.classList.add('active');
-        state.sort = chip.dataset.sort;
-        loadItems(true);
-        if (tg) tg.HapticFeedback?.selectionChanged();
-    }));
+.state-btn {
+    margin-top: 6px;
+    padding: 10px 26px;
+    background: var(--accent-dim);
+    border: 1px solid var(--accent-border);
+    border-radius: 20px;
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.18s;
+}
+.state-btn:hover { background: var(--accent-soft); }
 
-$$('.method-btn').forEach((b) =>
-    b.addEventListener('click', () => {
-        $$('.method-btn').forEach((x) => x.classList.remove('active'));
-        b.classList.add('active');
-        state.method = b.dataset.method;
-        $('modal-disclaimer').textContent = state.method === 'tonconnect'
-            ? 'Оплата TON-гаманцем: подарунок одразу зараховується на ваш акаунт.'
-            : 'Оплата Telegram Stars: видача обробляється сервісом після оплати.';
-        if (tg) tg.HapticFeedback?.selectionChanged();
-    }));
+/* ╭──────────────────── Orders list ────────────────────╮ */
 
-$$('.nav-btn').forEach((b) =>
-    b.addEventListener('click', () => setTab(b.dataset.tab)));
+.orders-list { padding: 12px 16px; }
 
-$$('#orders-filter [data-kind]').forEach((t) =>
-    t.addEventListener('click', () => {
-        $$('#orders-filter .r-tab').forEach((x) => x.classList.remove('active'));
-        t.classList.add('active');
-        state.ordersKind = t.dataset.kind;
-        loadOrders();
-    }));
+.order-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 10px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    animation: card-in 0.36s var(--ease-out) both;
+}
+.order-card:hover {
+    border-color: var(--border-hi);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+}
 
-let searchTimer;
-$('search-input').addEventListener('input', (e) => {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => {
-        state.query = e.target.value;
-        renderGrid();
-    }, 150);
-});
+.order-img {
+    width: 58px; height: 58px;
+    border-radius: 14px;
+    background: var(--surface-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    overflow: hidden;
+}
 
-// ─── Init ───────────────────────────────────────────────────────────────────
+.order-img img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+}
 
-loadItems(true);
+.order-info { flex: 1; min-width: 0; }
+
+.order-name {
+    font-size: 14px; font-weight: 600;
+    margin-bottom: 3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.order-meta { font-size: 11px; color: var(--text-muted); margin-bottom: 7px; }
+
+.order-bottom {
+    display: flex; align-items: center;
+    justify-content: space-between; gap: 8px;
+}
+
+.order-price { font-size: 13px; font-weight: 700; color: var(--text-soft); }
+
+.order-cancel-btn {
+    background: transparent;
+    border: 1px solid var(--border-hi);
+    color: var(--text-dim);
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-family: var(--font);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.18s;
+}
+.order-cancel-btn:hover {
+    color: var(--accent-2);
+    border-color: var(--accent-border);
+}
+
+/* status badges */
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 7px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.badge::before {
+    content: '';
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.badge-fulfilled              { background: var(--green-dim); color: var(--green); }
+.badge-fulfilled::before      { background: var(--green); box-shadow: 0 0 6px var(--green); animation: badge-pulse 1.8s infinite; }
+
+.badge-confirming, .badge-submitted, .badge-awaiting_signature, .badge-paid, .badge-invoiced, .badge-created {
+    background: var(--ton-dim); color: var(--ton);
+}
+.badge-confirming::before, .badge-submitted::before, .badge-awaiting_signature::before,
+.badge-paid::before, .badge-invoiced::before, .badge-created::before {
+    background: var(--ton); animation: badge-pulse 1.4s infinite;
+}
+
+.badge-paid_unfulfilled { background: var(--orange-dim); color: var(--orange); }
+.badge-paid_unfulfilled::before { background: var(--orange); animation: badge-pulse 1.4s infinite; }
+
+.badge-failed, .badge-expired { background: var(--accent-dim); color: var(--accent-3); }
+.badge-failed::before, .badge-expired::before { background: var(--accent-2); }
+
+@keyframes badge-pulse {
+    0%,100% { opacity: 1; }
+    50%     { opacity: 0.3; }
+}
+
+/* ╭──────────────────── Settings ────────────────────╮ */
+
+.settings-list { padding: 16px; }
+
+.settings-card {
+    background: linear-gradient(135deg, var(--surface), var(--surface-2));
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 16px;
+    position: relative;
+    overflow: hidden;
+}
+
+.settings-card::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 120px; height: 120px;
+    background: radial-gradient(circle, var(--accent-dim) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.settings-avatar {
+    width: 54px; height: 54px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #800d10);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 700;
+    box-shadow: 0 4px 20px var(--accent-glow2), 0 0 0 3px rgba(212,17,21,0.15);
+    flex-shrink: 0;
+    position: relative;
+}
+
+.settings-user-info { flex: 1; min-width: 0; }
+.settings-user-name { font-size: 16px; font-weight: 700; }
+.settings-user-uid  { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+
+.settings-row {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    transition: border-color 0.18s;
+}
+
+.settings-row.info { }
+.settings-row.link { text-decoration: none; color: var(--text); cursor: pointer; }
+.settings-row.link:hover { border-color: var(--accent-border); }
+
+.settings-row-label { font-size: 14px; color: var(--text-soft); }
+
+.settings-row-value {
+    font-size: 13px; color: var(--text-dim);
+    max-width: 60%; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+    font-family: var(--font);
+}
+
+.settings-section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: var(--text-muted);
+    margin: 20px 4px 8px;
+    font-weight: 700;
+}
+
+.settings-btn {
+    width: 100%;
+    background: linear-gradient(135deg, var(--accent), #b00d10);
+    border: none;
+    color: #fff;
+    padding: 14px;
+    border-radius: var(--radius);
+    font-family: var(--font);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 20px var(--accent-glow2), 0 1px 0 rgba(255,255,255,0.08) inset;
+    transition: opacity 0.18s, transform 0.1s, box-shadow 0.2s;
+}
+.settings-btn:hover   { box-shadow: 0 6px 28px var(--accent-glow); }
+.settings-btn:active  { transform: scale(0.98); opacity: 0.88; }
+
+.settings-btn.disconnect {
+    background: transparent;
+    border: 1px solid var(--border-hi);
+    color: var(--text-dim);
+    box-shadow: none;
+}
+.settings-btn.disconnect:hover { border-color: var(--accent-border); color: var(--text); }
+
+/* ╭──────────────────── Bottom nav ────────────────────╮ */
+
+.bottom-nav {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 40;
+    display: flex;
+    background: rgba(8,8,8,0.94);
+    backdrop-filter: blur(28px) saturate(200%);
+    -webkit-backdrop-filter: blur(28px) saturate(200%);
+    border-top: 1px solid var(--border);
+    padding: 6px 0 calc(8px + var(--safe-bottom));
+}
+
+.nav-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-faint);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 6px 0;
+    font-family: var(--font);
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.2s;
+    position: relative;
+}
+
+.nav-btn.active {
+    color: var(--accent);
+    text-shadow: 0 0 14px var(--accent-glow);
+}
+
+.nav-btn svg { transition: transform 0.22s var(--ease-spring); }
+.nav-btn.active svg {
+    transform: scale(1.12) translateY(-1px);
+    filter: drop-shadow(0 0 6px var(--accent-glow));
+}
+
+.nav-btn::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%; transform: translateX(-50%);
+    width: 20px; height: 2px;
+    background: var(--accent);
+    border-radius: 1px;
+    opacity: 0;
+    transition: opacity 0.22s, width 0.22s var(--ease-spring);
+}
+.nav-btn.active::after { opacity: 1; width: 28px; }
+
+/* ╭──────────────────── Modal sheet ────────────────────╮ */
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.78);
+    z-index: 100;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    backdrop-filter: blur(8px) saturate(150%);
+    -webkit-backdrop-filter: blur(8px) saturate(150%);
+    animation: overlay-in 0.22s ease;
+}
+
+.modal-overlay[hidden] { display: none; }
+
+@keyframes overlay-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.modal-sheet {
+    width: 100%;
+    max-width: 480px;
+    background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 100%);
+    border-radius: 26px 26px 0 0;
+    border-top: 1px solid var(--border-hi);
+    padding: 8px 20px calc(30px + var(--safe-bottom));
+    animation: sheet-up 0.3s var(--ease-out);
+    max-height: 92vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    position: relative;
+}
+
+.modal-sheet::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+}
+
+@keyframes sheet-up {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+}
+
+.modal-drag-handle {
+    width: 42px; height: 4px;
+    background: var(--surface-hi);
+    border-radius: 2px;
+    margin: 6px auto 20px;
+}
+
+.modal-gift-preview {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.modal-img-wrap {
+    flex-shrink: 0;
+    width: 84px; height: 84px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, var(--surface-2), var(--surface-3));
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-hi);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+
+.modal-gift-img { width: 100%; height: 100%; object-fit: cover; }
+
+.modal-gift-info { flex: 1; min-width: 0; }
+
+.modal-gift-name {
+    font-size: 18px; font-weight: 800;
+    line-height: 1.2; margin-bottom: 5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.modal-gift-addr {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    font-family: monospace;
+    letter-spacing: 0.2px;
+}
+
+.modal-ppd {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 3px;
+    background: var(--ton-dim);
+    border: 1px solid var(--ton-border);
+    border-radius: 10px;
+    padding: 5px 12px;
+}
+
+.modal-ppd-stars { font-size: 15px; font-weight: 800; color: var(--ton); }
+.modal-ppd-label { font-size: 11.5px; color: var(--text-dim); }
+
+.modal-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-hi), transparent);
+    margin: 0 -20px 20px;
+}
+
+/* duration slider */
+
+.duration-section { margin-bottom: 22px; }
+
+.duration-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.duration-label { font-size: 14px; color: var(--text-dim); }
+.duration-value { font-size: 17px; font-weight: 800; color: var(--text); }
+
+.slider-track-wrap { padding: 0 2px; margin-bottom: 8px; }
+
+.duration-slider {
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--surface-3);
+    outline: none;
+    cursor: pointer;
+}
+
+.duration-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-2), var(--accent));
+    cursor: pointer;
+    box-shadow: 0 0 0 4px var(--accent-dim), 0 2px 16px var(--accent-glow);
+    transition: box-shadow 0.18s, transform 0.12s;
+}
+
+.duration-slider::-webkit-slider-thumb:active {
+    box-shadow: 0 0 0 8px var(--accent-dim), 0 2px 24px var(--accent-glow);
+    transform: scale(1.12);
+}
+
+.duration-slider::-moz-range-thumb {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-2), var(--accent));
+    border: none; cursor: pointer;
+    box-shadow: 0 2px 16px var(--accent-glow);
+}
+
+.duration-range-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px; color: var(--text-muted);
+}
+
+/* totals */
+
+.total-section {
+    background: linear-gradient(135deg, var(--surface-3), var(--surface-2));
+    border: 1px solid var(--border-hi);
+    border-radius: var(--radius-sm);
+    padding: 16px 18px;
+    margin-bottom: 16px;
+    position: relative;
+    overflow: hidden;
+}
+
+.total-section::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-hi), transparent);
+}
+
+.total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.total-label { font-size: 13px; color: var(--text-dim); }
+
+.total-amount-col {
+    display: flex; flex-direction: column;
+    align-items: flex-end; gap: 2px;
+}
+
+.total-stars {
+    font-size: 24px; font-weight: 800;
+    color: #fff; line-height: 1;
+    text-shadow: 0 0 20px rgba(255,255,255,0.15);
+    transition: transform 0.18s var(--ease-spring);
+}
+
+.total-section.bump .total-stars {
+    animation: bump 0.32s var(--ease-spring);
+}
+
+@keyframes bump {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.10); color: var(--accent-3); }
+    100% { transform: scale(1); }
+}
+
+.total-ton {
+    font-size: 12px; color: var(--text-muted);
+    font-weight: 600;
+}
+
+.discount-row {
+    margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid var(--border);
+}
+
+.discount-text { font-size: 12px; color: var(--green); font-weight: 600; }
+
+/* method toggle */
+
+.method-toggle { display: flex; gap: 8px; margin-bottom: 14px; }
+
+.method-btn {
+    flex: 1;
+    padding: 12px 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-3);
+    color: var(--text-dim);
+    font-family: var(--font);
+    font-size: 13px; font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+
+.method-btn.active {
+    border-color: var(--accent-border);
+    background: var(--accent-dim);
+    color: var(--text);
+    box-shadow: 0 0 20px var(--accent-dim);
+}
+
+.method-ic { font-size: 15px; }
+
+/* ╭──────────────────── Top-up hint ────────────────────╮ */
+
+.topup-hint {
+    background: linear-gradient(135deg, rgba(74,158,255,0.07), rgba(74,158,255,0.04));
+    border: 1px solid rgba(74,158,255,0.22);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    margin-bottom: 14px;
+    animation: card-in 0.3s var(--ease-out);
+}
+
+.topup-hint-title {
+    font-size: 13.5px; font-weight: 700;
+    margin-bottom: 6px; color: var(--ton);
+    display: flex; align-items: center; gap: 6px;
+}
+
+.topup-hint-desc {
+    font-size: 12px; color: var(--text-dim);
+    margin-bottom: 12px; line-height: 1.55;
+}
+
+.topup-hint-addr {
+    font-family: monospace;
+    font-size: 10.5px; color: var(--text-soft);
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border-hi);
+    border-radius: 8px;
+    padding: 9px 12px;
+    word-break: break-all;
+    margin-bottom: 10px;
+    letter-spacing: 0.3px;
+}
+
+.topup-copy-btn {
+    width: 100%;
+    background: rgba(74,158,255,0.10);
+    border: 1px solid rgba(74,158,255,0.25);
+    color: var(--ton);
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-family: var(--font);
+    font-size: 12.5px; font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+
+.topup-copy-btn:hover {
+    background: rgba(74,158,255,0.18);
+    border-color: rgba(74,158,255,0.45);
+    box-shadow: 0 0 16px rgba(74,158,255,0.15);
+}
+
+/* ╭──────────────────── Inline error block ────────────────────╮ */
+
+.modal-error {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    background: linear-gradient(135deg, rgba(212,17,21,0.10), rgba(212,17,21,0.04));
+    border: 1px solid var(--accent-border);
+    border-radius: var(--radius-sm);
+    padding: 13px 14px;
+    margin-bottom: 14px;
+    animation: shake 0.4s var(--ease-out);
+    position: relative;
+}
+
+.modal-error[hidden] { display: none; }
+
+@keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20%     { transform: translateX(-6px); }
+    40%     { transform: translateX(5px); }
+    60%     { transform: translateX(-3px); }
+    80%     { transform: translateX(2px); }
+}
+
+.modal-error-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+    line-height: 1.2;
+}
+
+.modal-error-body { flex: 1; min-width: 0; }
+
+.modal-error-title {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--accent-3);
+    margin-bottom: 3px;
+}
+
+.modal-error-desc {
+    font-size: 12px;
+    color: var(--text-soft);
+    line-height: 1.5;
+}
+
+.modal-error-close {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: color 0.18s;
+}
+.modal-error-close:hover { color: var(--text); }
+
+/* ╭──────────────────── Rent / buy button ────────────────────╮ */
+
+.rent-btn {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--accent-2) 0%, var(--accent) 60%, #900d10 100%);
+    border: none;
+    border-radius: var(--radius);
+    color: #fff;
+    font-family: var(--font);
+    font-size: 16px; font-weight: 800;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    transition: opacity 0.18s, transform 0.12s, box-shadow 0.25s;
+    box-shadow: 0 4px 28px var(--accent-glow2), 0 1px 0 rgba(255,255,255,0.10) inset;
+    margin-bottom: 14px;
+    position: relative;
+    overflow: hidden;
+    letter-spacing: 0.2px;
+    min-height: 54px;
+}
+
+.rent-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 60%);
+    pointer-events: none;
+}
+
+/* Sheen sweep on hover */
+.rent-btn::before {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 30%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+    transform: translateX(-200%) skewX(-20deg);
+    transition: transform 0.7s var(--ease-out);
+    pointer-events: none;
+}
+.rent-btn:hover::before { transform: translateX(400%) skewX(-20deg); }
+
+.rent-btn:hover   { box-shadow: 0 6px 36px var(--accent-glow); }
+.rent-btn:active  { transform: scale(0.98); opacity: 0.90; }
+.rent-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+    background: var(--surface-hi);
+    box-shadow: none;
+}
+.rent-btn:disabled::before { display: none; }
+
+.rent-btn-spinner {
+    display: none;
+    width: 18px;
+    height: 18px;
+    border: 2.5px solid rgba(255,255,255,0.25);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+
+.rent-btn.loading .rent-btn-spinner { display: inline-block; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.modal-disclaimer {
+    font-size: 11px; color: var(--text-muted);
+    text-align: center; line-height: 1.65;
+}
+
+/* ╭──────────────────── Success overlay ────────────────────╮ */
+
+.success-overlay {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 40%, rgba(212,17,21,0.08) 0%, var(--bg) 60%);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+    animation: fade-in 0.28s ease;
+}
+
+.success-overlay[hidden] { display: none; }
+
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.success-content { text-align: center; max-width: 320px; }
+
+.success-anim {
+    margin-bottom: 24px;
+    animation: pop-in 0.5s var(--ease-spring);
+    filter: drop-shadow(0 0 32px var(--accent-glow2));
+}
+
+@keyframes pop-in {
+    from { transform: scale(0.4); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+}
+
+.success-title {
+    font-size: 28px; font-weight: 800;
+    margin-bottom: 10px;
+    background: linear-gradient(135deg, #fff, var(--accent-3));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.success-desc {
+    font-size: 15px; color: var(--text-dim);
+    margin-bottom: 36px; line-height: 1.6;
+}
+
+.success-btn {
+    padding: 15px 52px;
+    background: linear-gradient(135deg, var(--accent-2), var(--accent));
+    border: none;
+    border-radius: var(--radius);
+    color: #fff;
+    font-family: var(--font);
+    font-size: 16px; font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 4px 28px var(--accent-glow2);
+    transition: opacity 0.18s, transform 0.12s;
+    letter-spacing: 0.2px;
+}
+
+.success-btn:hover  { box-shadow: 0 6px 36px var(--accent-glow); }
+.success-btn:active { opacity: 0.88; transform: scale(0.98); }
+
+/* ╭──────────────────── Toast stack ────────────────────╮ */
+
+.toast-stack {
+    position: fixed;
+    left: 50%;
+    bottom: calc(var(--nav-h) + var(--safe-bottom) + 16px);
+    transform: translateX(-50%);
+    z-index: 300;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 8px;
+    pointer-events: none;
+    width: calc(100% - 32px);
+    max-width: 448px;
+}
+
+.toast {
+    pointer-events: auto;
+    background: rgba(16,16,16,0.96);
+    border: 1px solid var(--border-hi);
+    border-radius: var(--radius-sm);
+    padding: 12px 16px;
+    color: var(--text);
+    font-size: 13px; font-weight: 500;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.55);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    animation: toast-in 0.24s var(--ease-out);
+    display: flex; align-items: center; gap: 10px;
+}
+
+.toast.success { border-color: rgba(61,220,94,0.35); }
+.toast.error   { border-color: var(--accent-border); }
+.toast.info    { border-color: var(--border-hi); }
+
+.toast-ic { font-size: 17px; flex-shrink: 0; }
+
+@keyframes toast-in {
+    from { transform: translateY(16px) scale(0.96); opacity: 0; }
+    to   { transform: translateY(0)    scale(1);    opacity: 1; }
+}
