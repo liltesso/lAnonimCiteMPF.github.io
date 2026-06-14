@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#060608">
-    <title>Asset Market</title>
+    <title>Gifts Market</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -27,6 +27,211 @@
 <div class="glow-spot spot-1" aria-hidden="true"></div>
 <div class="glow-spot spot-2" aria-hidden="true"></div>
 
+<!-- ══════════════════ ALERTS / MAP ══════════════════ -->
+<section class="view hidden" data-view="alerts">
+
+    <header class="alerts-hdr" id="alerts-header">
+        <div class="alerts-status-banner" id="alerts-status">
+            <div class="status-dot" id="status-dot"></div>
+            <div class="status-text">
+                <div class="status-title" id="alerts-status-title" data-i18n="alerts_calm">Тихо</div>
+                <div class="status-sub"   id="alerts-status-sub"   data-i18n="alerts_no_threats">Активних загроз не зафіксовано</div>
+            </div>
+            <button class="icon-btn" id="alerts-refresh-btn" aria-label="Оновити">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 12a9 9 0 019-9 9 9 0 016.4 2.6L21 8"/><path d="M21 3v5h-5"/>
+                    <path d="M21 12a9 9 0 01-9 9 9 9 0 01-6.4-2.6L3 16"/><path d="M3 21v-5h5"/>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <main class="alerts-body">
+
+        <!-- MAP -->
+        <div class="map-container" id="map-container">
+            <div class="map-bg-glow"></div>
+
+            <svg id="alerts-map" class="alerts-map" viewBox="0 0 1000 660"
+                 preserveAspectRatio="xMidYMid meet" role="img" aria-label="Карта повітряних тривог України">
+                <defs>
+                    <!-- Threat glow -->
+                    <radialGradient id="tGlow" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%"   stop-color="#ff2a2e" stop-opacity="0.9"/>
+                        <stop offset="100%" stop-color="#ff2a2e" stop-opacity="0"/>
+                    </radialGradient>
+                    <!-- Ukraine fill gradient -->
+                    <linearGradient id="uaFill" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%"   stop-color="#1c2a46" stop-opacity="0.72"/>
+                        <stop offset="50%"  stop-color="#162038" stop-opacity="0.60"/>
+                        <stop offset="100%" stop-color="#0e1520" stop-opacity="0.52"/>
+                    </linearGradient>
+                    <!-- Water fill gradient -->
+                    <linearGradient id="waterFill" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%"   stop-color="#091828" stop-opacity="0.88"/>
+                        <stop offset="100%" stop-color="#060e1c" stop-opacity="0.78"/>
+                    </linearGradient>
+                    <!-- Border glow filter -->
+                    <filter id="borderGlow" x="-5%" y="-5%" width="110%" height="110%">
+                        <feGaussianBlur stdDeviation="2.5" result="blur"/>
+                        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                    </filter>
+                    <!-- Threat drop-shadow -->
+                    <filter id="threatShadow" x="-50%" y="-50%" width="200%" height="200%">
+                        <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#ff2a2e" flood-opacity="0.8"/>
+                    </filter>
+                    <!-- Ukraine clip -->
+                    <clipPath id="uaClip">
+                        <path d="M 130,54 L 270,47 L 378,47 L 432,23 L 568,8 L 622,16 L 649,54 L 730,93 L 865,194 L 946,272 L 984,365 L 984,388 L 919,419 L 838,427 L 784,466 L 746,497 L 714,489 L 692,520 L 730,567 L 703,606 L 649,629 L 568,621 L 524,598 L 541,544 L 514,466 L 470,474 L 416,466 L 378,489 L 335,536 L 324,505 L 314,388 L 324,350 L 270,311 L 249,303 L 189,311 L 135,272 L 108,210 L 81,163 L 54,140 L 38,109 L 16,85 L 54,47 L 108,47 Z"/>
+                    </clipPath>
+                    <!-- Crimea diagonal hatch (occupied territory) -->
+                    <pattern id="crimea-hatch" x="0" y="0" width="8" height="8"
+                             patternUnits="userSpaceOnUse" patternTransform="rotate(42)">
+                        <line x1="0" y1="0" x2="0" y2="8" stroke="rgba(130,160,230,0.55)" stroke-width="1.2"/>
+                    </pattern>
+                    <!-- Subtle lat/lon grid inside UA -->
+                    <pattern id="ua-grid" x="0" y="0" width="50" height="44"
+                             patternUnits="userSpaceOnUse">
+                        <path d="M 50 0 L 0 0 0 44" fill="none"
+                              stroke="rgba(255,255,255,0.018)" stroke-width="0.5"/>
+                    </pattern>
+                </defs>
+
+                <!-- Sea / outside (dark navy) -->
+                <rect width="1000" height="660" fill="#060b14"/>
+
+                <!-- Black Sea: south of Ukraine -->
+                <path class="map-black-sea" d="M 0,480 L 130,430 L 220,440 L 330,490 L 416,495 L 470,472 L 514,466 L 541,544 L 524,598 L 568,621 L 649,629 L 703,606 L 730,567 L 784,521 L 1000,480 L 1000,660 L 0,660 Z"/>
+
+                <!-- Ukraine filled body -->
+                <path class="ua-body" d="M 130,54 L 270,47 L 378,47 L 432,23 L 568,8 L 622,16 L 649,54 L 730,93 L 865,194 L 946,272 L 984,365 L 984,388 L 919,419 L 838,427 L 784,466 L 746,497 L 714,489 L 692,520 L 730,567 L 703,606 L 649,629 L 568,621 L 524,598 L 541,544 L 514,466 L 470,474 L 416,466 L 378,489 L 335,536 L 324,505 L 314,388 L 324,350 L 270,311 L 249,303 L 189,311 L 135,272 L 108,210 L 81,163 L 54,140 L 38,109 L 16,85 L 54,47 L 108,47 Z"
+                      fill="url(#uaFill)"/>
+
+                <!-- Grid overlay inside Ukraine -->
+                <rect class="map-grid-overlay" x="0" y="0" width="1000" height="660" clip-path="url(#uaClip)"/>
+
+                <!-- Sea of Azov (drawn over Ukraine body to show water) -->
+                <path class="map-azov-sea"
+                      d="M 692,477 L 714,467 L 784,450 L 838,427 L 919,404 L 962,378 L 962,400 L 838,443 L 784,521 L 708,511 Z"/>
+
+                <!-- Dnipro river -->
+                <path class="map-river" fill="none"
+                      d="M 597,28 C 582,65 562,110 535,165 C 516,202 504,235 504,245
+                         C 510,268 528,278 555,300 C 596,325 644,318 695,318
+                         C 712,336 712,356 700,376 C 682,400 646,414 614,430
+                         C 594,445 578,455 571,470"/>
+                <!-- Dniester river (Дністер) - W Ukraine -->
+                <path class="map-river" fill="none"
+                      d="M 135,100 C 148,135 155,170 160,210
+                         C 168,250 178,290 200,330
+                         C 220,366 248,395 265,430
+                         C 290,470 318,490 335,510"/>
+                <!-- Southern Bug river -->
+                <path class="map-river" fill="none"
+                      d="M 294,210 C 302,240 315,270 330,300
+                         C 348,334 368,360 390,390
+                         C 408,415 425,440 445,460"/>
+
+                <!-- Crimea: occupied territory (separate fill + hatch) -->
+                <path class="ua-crimea"
+                      d="M 514,466 L 541,544 L 524,598 L 568,621 L 649,629 L 703,606 L 730,567 L 692,520 Z"/>
+                <path class="ua-crimea-hatch"
+                      d="M 514,466 L 541,544 L 524,598 L 568,621 L 649,629 L 703,606 L 730,567 L 692,520 Z"/>
+
+                <!-- Ukraine border (glow + crisp) -->
+                <path class="ua-border-glow" d="M 130,54 L 270,47 L 378,47 L 432,23 L 568,8 L 622,16 L 649,54 L 730,93 L 865,194 L 946,272 L 984,365 L 984,388 L 919,419 L 838,427 L 784,466 L 746,497 L 714,489 L 692,520 L 730,567 L 703,606 L 649,629 L 568,621 L 524,598 L 541,544 L 514,466 L 470,474 L 416,466 L 378,489 L 335,536 L 324,505 L 314,388 L 324,350 L 270,311 L 249,303 L 189,311 L 135,272 L 108,210 L 81,163 L 54,140 L 38,109 L 16,85 L 54,47 L 108,47 Z"/>
+                <path class="ua-border"     d="M 130,54 L 270,47 L 378,47 L 432,23 L 568,8 L 622,16 L 649,54 L 730,93 L 865,194 L 946,272 L 984,365 L 984,388 L 919,419 L 838,427 L 784,466 L 746,497 L 714,489 L 692,520 L 730,567 L 703,606 L 649,629 L 568,621 L 524,598 L 541,544 L 514,466 L 470,474 L 416,466 L 378,489 L 335,536 L 324,505 L 314,388 L 324,350 L 270,311 L 249,303 L 189,311 L 135,272 L 108,210 L 81,163 L 54,140 L 38,109 L 16,85 L 54,47 L 108,47 Z"/>
+
+                <!-- Water labels -->
+                <text class="map-water-label" x="420" y="590" text-anchor="middle" font-size="11">Чорне море</text>
+                <text class="map-water-label" x="840" y="460" text-anchor="middle" font-size="8.5">Азовське море</text>
+                <text class="map-water-label" x="628" y="588" text-anchor="middle" font-size="7.5" opacity="0.7">Крим ⚠</text>
+
+                <!-- Compass rose -->
+                <g class="map-compass" transform="translate(967,42)">
+                    <circle r="17" fill="rgba(0,0,0,0.52)" stroke="rgba(255,255,255,0.10)" stroke-width="0.5"/>
+                    <polygon points="0,-13 2.5,-5 0,-8.5 -2.5,-5" fill="#d41115" opacity="0.80"/>
+                    <polygon points="0,13 2.5,5 0,8.5 -2.5,5" fill="rgba(255,255,255,0.32)"/>
+                    <polygon points="-13,0 -5,2.5 -8.5,0 -5,-2.5" fill="rgba(255,255,255,0.18)"/>
+                    <polygon points="13,0 5,2.5 8.5,0 5,-2.5" fill="rgba(255,255,255,0.18)"/>
+                    <text x="0" y="-18" text-anchor="middle" fill="rgba(255,255,255,0.38)"
+                          font-size="6.5" font-family="sans-serif" font-weight="700">N</text>
+                </g>
+
+                <!-- Cities (populated via JS) -->
+                <g id="map-cities"></g>
+                <!-- Threats (populated via JS) -->
+                <g id="map-threats"></g>
+            </svg>
+
+            <!-- Map overlay controls -->
+            <div class="map-legend">
+                <span><i class="ldot red"></i><span data-i18n="legend_threat">Загроза</span></span>
+                <span><i class="ldot blue"></i><span data-i18n="legend_city">Місто</span></span>
+                <span><i class="ldot river"></i><span>Дніпро</span></span>
+            </div>
+            <!-- Zoom controls -->
+            <div class="map-zoom-btns" role="group" aria-label="Масштаб карти">
+                <button class="map-zoom-btn" id="map-zoom-in"  aria-label="Збільшити">+</button>
+                <button class="map-zoom-btn" id="map-zoom-out" aria-label="Зменшити">−</button>
+            </div>
+            <button class="map-zoom-reset" id="map-zoom-reset" title="Скинути вид">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+                    <path d="M3 12a9 9 0 019-9 9 9 0 016.4 2.6L21 8"/><path d="M21 3v5h-5"/>
+                    <path d="M21 12a9 9 0 01-9 9 9 9 0 01-6.4-2.6L3 16"/><path d="M3 21v-5h5"/>
+                </svg>
+            </button>
+            <div class="map-zoom-hint">Pinch / scroll / ± для зуму</div>
+
+            <!-- Threat detail popup -->
+            <div class="threat-popup" id="threat-popup" hidden>
+                <button class="threat-popup-close" id="threat-popup-close">×</button>
+                <div class="threat-popup-icon" id="threat-popup-icon"></div>
+                <div class="threat-popup-content">
+                    <div class="threat-popup-name"  id="threat-popup-name"></div>
+                    <div class="threat-popup-route" id="threat-popup-route"></div>
+                    <div class="threat-popup-tags"  id="threat-popup-tags"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STATS STRIP -->
+        <div class="alerts-stats" id="alerts-stats">
+            <div class="stat-card skeleton-stat"></div>
+            <div class="stat-card skeleton-stat"></div>
+            <div class="stat-card skeleton-stat"></div>
+            <div class="stat-card skeleton-stat"></div>
+        </div>
+
+        <!-- ACTIVE THREATS -->
+        <div class="alerts-section">
+            <div class="section-hdr">
+                <span class="section-title" data-i18n="alerts_active">Активні загрози</span>
+                <span class="count-chip" id="alerts-count-badge">0</span>
+            </div>
+            <div class="threats-list" id="alerts-threats-list">
+                <div class="threat-skeleton"></div>
+                <div class="threat-skeleton"></div>
+            </div>
+        </div>
+
+        <!-- RECENT ATTACKS -->
+        <div class="alerts-section">
+            <div class="section-hdr">
+                <span class="section-title" data-i18n="alerts_recent">Останні атаки</span>
+            </div>
+            <div class="attacks-list" id="alerts-attacks-list">
+                <div class="attack-skeleton"></div>
+                <div class="attack-skeleton"></div>
+            </div>
+        </div>
+
+        <div class="alerts-disclaimer" data-i18n="alerts_disclaimer">
+            ⚠️ Дані mapa.ua наближені, оновлюються в реальному часі. Не використовуйте для прийняття рішень — слідкуйте за офіційними джерелами.
+        </div>
+    </main>
+</section>
+
 <!-- ══════════════════ CATALOG ══════════════════ -->
 <section class="view" data-view="catalog">
 
@@ -34,7 +239,7 @@
         <div class="r-header-top">
             <div class="r-brand">
                 <div class="r-brand-dot"></div>
-                <h1 class="r-brand-name">Asset <span class="accent">Market</span></h1>
+                <h1 class="r-brand-name">Gifts <span class="accent">Market</span></h1>
             </div>
             <div id="ton-connect" class="ton-connect-slot"></div>
         </div>
@@ -111,7 +316,6 @@
     </header>
     <main class="settings-body">
 
-        <!-- User identity -->
         <div class="user-card" id="user-card">
             <div class="user-avatar" id="user-avatar">?</div>
             <div class="user-info">
@@ -121,75 +325,17 @@
             <div class="user-badge">TON</div>
         </div>
 
-        <!-- Wallet card with live balance -->
-        <div class="wallet-card" id="wallet-card">
-            <div class="wallet-card-head">
-                <span class="wallet-card-label" data-i18n="wallet_balance">Баланс гаманця</span>
-                <button class="wallet-refresh" id="wallet-refresh-btn" aria-label="Оновити баланс">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 12a9 9 0 019-9 9 9 0 016.4 2.6L21 8"/><path d="M21 3v5h-5"/>
-                        <path d="M21 12a9 9 0 01-9 9 9 9 0 01-6.4-2.6L3 16"/><path d="M3 21v-5h5"/>
-                    </svg>
-                </button>
-            </div>
-            <div class="wallet-balance-row">
-                <span class="wallet-balance" id="wallet-balance">—</span>
-                <span class="wallet-balance-cur">TON</span>
-            </div>
-            <div class="wallet-balance-uah" id="wallet-balance-uah"></div>
-            <div class="wallet-addr-chip" id="wallet-addr-chip" hidden>
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="2" y="6" width="20" height="13" rx="2.5"/><path d="M16 12h2"/>
-                </svg>
-                <span id="wallet-addr-text">—</span>
-            </div>
-            <div class="wallet-actions">
-                <button class="wallet-btn primary" id="wallet-action-btn" data-i18n="connect_wallet">Підключити гаманець</button>
-                <button class="wallet-btn ghost" id="wallet-topup-btn" data-i18n="topup_wallet" hidden>Поповнити</button>
-            </div>
-        </div>
-
-        <!-- Quick actions -->
-        <div class="settings-label" data-i18n="actions_label">Швидкі дії</div>
-        <div class="quick-actions">
-            <button class="quick-action" data-action="support">
-                <span class="qa-ic">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/>
-                    </svg>
-                </span>
-                <span class="qa-label" data-i18n="support">Підтримка</span>
-            </button>
-            <button class="quick-action" data-action="news">
-                <span class="qa-ic">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M4 11a9 9 0 019 9M4 4a16 16 0 0116 16"/><circle cx="5" cy="19" r="1.5" fill="currentColor"/>
-                    </svg>
-                </span>
-                <span class="qa-label" data-i18n="news">Новини</span>
-            </button>
-            <button class="quick-action" data-action="share">
-                <span class="qa-ic">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-                        <path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>
-                    </svg>
-                </span>
-                <span class="qa-label" data-i18n="share_app">Поділитися</span>
-            </button>
-            <button class="quick-action" data-action="rate">
-                <span class="qa-ic">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 2l3 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.9 21l1.2-6.8-5-4.9 6.9-1z"/>
-                    </svg>
-                </span>
-                <span class="qa-label" data-i18n="rate_app">Оцінити</span>
-            </button>
-        </div>
-
-        <!-- Language -->
         <div class="settings-section">
-            <div class="settings-label" data-i18n="language_label">Мова</div>
+            <div class="settings-label" data-i18n="ton_wallet">TON-гаманець</div>
+            <div class="settings-row">
+                <span class="settings-row-label" data-i18n="ton_wallet">Гаманець</span>
+                <span class="settings-row-val" id="wallet-status">не підключено</span>
+            </div>
+            <button class="settings-action-btn" id="wallet-action-btn" data-i18n="connect_wallet">Підключити гаманець</button>
+        </div>
+
+        <div class="settings-section">
+            <div class="settings-label" data-i18n="language_label">Мова / Language</div>
             <div class="lang-row">
                 <button class="lang-btn active" data-lang="uk">🇺🇦 Укр</button>
                 <button class="lang-btn" data-lang="en">🇬🇧 Eng</button>
@@ -197,51 +343,20 @@
             </div>
         </div>
 
-        <!-- Useful links -->
-        <div class="settings-section">
-            <div class="settings-label" data-i18n="links_label">Корисні посилання</div>
-            <button class="link-row" data-link="how">
-                <span class="link-ic">⚙️</span>
-                <span class="link-text" data-i18n="how_it_works">Як це працює</span>
-                <span class="link-arrow">›</span>
-            </button>
-            <button class="link-row" data-link="faq">
-                <span class="link-ic">❓</span>
-                <span class="link-text" data-i18n="faq">Часті запитання</span>
-                <span class="link-arrow">›</span>
-            </button>
-            <button class="link-row" data-link="terms">
-                <span class="link-ic">📄</span>
-                <span class="link-text" data-i18n="terms">Публічна оферта</span>
-                <span class="link-arrow">›</span>
-            </button>
-            <button class="link-row" data-link="privacy">
-                <span class="link-ic">🔒</span>
-                <span class="link-text" data-i18n="privacy">Політика конфіденційності</span>
-                <span class="link-arrow">›</span>
-            </button>
-            <button class="link-row" data-link="phone">
-                <span class="link-ic">📞</span>
-                <span class="link-text">+380 68 752 51 55</span>
-                <span class="link-arrow">›</span>
-            </button>
-        </div>
-
-        <!-- About service -->
         <div class="settings-section">
             <div class="settings-label" data-i18n="about">Про сервіс</div>
-            <p class="about-desc" id="about-desc" data-i18n="about_desc"></p>
             <div class="settings-row">
                 <span class="settings-row-label" data-i18n="network">Мережа</span>
                 <span class="settings-row-val" id="net-info">TON Mainnet</span>
             </div>
-        </div>
-
-        <div class="secure-note">
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
-            </svg>
-            <span data-i18n="secure_ton">Захищено мережею TON</span>
+            <div class="settings-row">
+                <span class="settings-row-label" data-i18n="fee">Комісія</span>
+                <span class="settings-row-val" id="markup-info">~15%</span>
+            </div>
+            <div class="settings-row">
+                <span class="settings-row-label">Версія</span>
+                <span class="settings-row-val" style="color:var(--text-muted)">5.0.0</span>
+            </div>
         </div>
 
     </main>
@@ -259,7 +374,6 @@
         </div>
         <span class="nav-label" data-i18n="alerts_tab">Тривоги</span>
     </button>
-    <!-- nav-alerts click handled in rent.js: navigates to alerts.html -->
     <button class="nav-btn active" data-tab="catalog" role="tab" aria-label="Каталог">
         <div class="nav-icon">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
