@@ -1,1437 +1,1983 @@
-/**
- * Gifts Market Mini App — rent.js
- * Three tabs: Catalog / Orders / Profile
- */
+/* ╔══════════════════════════════════════════════════════════╗
+   ║  Gifts Market — Premium Dark UI v5                        ║
+   ╚══════════════════════════════════════════════════════════╝ */
 
-const BACKEND_URL     = (window.BACKEND_URL || '').replace(/\/$/, '');
-const TON_TO_UAH      = window.TON_TO_UAH || 180;
-const MERCHANT_WALLET = window.MERCHANT_WALLET || '';
-const tg = window.Telegram?.WebApp ?? null;
+/* ─── Design tokens ─────────────────────────────────────── */
+:root {
+    --bg:            #030305;
+    --bg-2:          #07080c;
+    --surface:       #0c0d12;
+    --surface-2:     #12131a;
+    --surface-3:     #181922;
+    --surface-hi:    #20212b;
+    --glass:         rgba(10,11,16,0.92);
+    --glass-btn:     rgba(255,255,255,0.06);
+    --glass-hi:      rgba(255,255,255,0.10);
+    --glass-border:  rgba(255,255,255,0.08);
+    --border:        rgba(255,255,255,0.07);
+    --border-hi:     rgba(255,255,255,0.12);
 
-// ─── i18n ────────────────────────────────────────────────────────────────────
+    --accent:        #f43f5e;
+    --accent-2:      #e11d48;
+    --accent-3:      #fb7185;
+    --accent-dim:    rgba(244,63,94,0.11);
+    --accent-soft:   rgba(244,63,94,0.20);
+    --accent-border: rgba(244,63,94,0.38);
+    --accent-glow:   rgba(244,63,94,0.60);
+    --accent-glow2:  rgba(244,63,94,0.28);
 
-const TR = {
-    uk: {
-        catalog:'Каталог', orders:'Замовлення', profile:'Профіль',
-        rent:'Оренда', sale:'Продаж',
-        popular:'Популярні', cheaper:'Дешевші', pricier:'Дорожчі', longer:'Довший термін',
-        search:'Пошук подарунків…', load_more:'Завантажити ще',
-        rent_btn:'Орендувати', buy_btn:'Купити',
-        total:'Разом', rent_days:'Термін оренди',
-        ton_payment:'Оплата TON',
-        connect_wallet:'Підключити гаманець', disconnect_wallet:'Від\'єднати гаманець',
-        ton_wallet:'TON-гаманець',
-        filters:'Фільтри', reset_all:'Скинути', apply_filters:'Застосувати',
-        collection:'Колекція', model:'Модель', backdrop:'Фон', symbol:'Символ', all:'Усі',
-        view_on_fragment:'Переглянути NFT',
-        per_day:'/ день', price_label:'ціна',
-        topup_title:'💳 Як поповнити гаманець',
-        topup_desc:'Переведіть TON на адресу або купіть через Tonkeeper / @wallet',
-        copy_addr:'Скопіювати адресу',
-        great:'Чудово!', about:'Про сервіс', network:'Мережа', fee:'Комісія',
-        language_label:'Мова',
-        err_no_backend:'BACKEND_URL не задано — додайте window.BACKEND_URL у rent.html',
-        err_marketapp_setup:'Налаштуйте MarketApp: зайдіть на marketapp.ws, підключіть гаманець і вручну орендуйте будь-який NFT.',
-        sign_tx:'Підпишіть транзакцію…', confirming_net:'Підтвердження в мережі…',
-        creating_order:'Створюємо замовлення…',
-        success_rent:'Оренду оформлено!', success_sale:'Покупку оформлено!',
-        alerts_tab:'Тривоги', alerts_calm:'Тихо', alerts_no_threats:'Активних загроз не зафіксовано',
-        alerts_no_threats_long:'Активних загроз немає. Бережіть себе.',
-        alerts_active:'Активні загрози', alerts_recent:'Останні атаки',
-        alerts_disclaimer:'⚠️ Дані mapa.ua наближені. Не використовуйте для прийняття рішень — слідкуйте за офіційними джерелами.',
-        legend_threat:'Загроза', legend_city:'Місто',
-    },
-    en: {
-        catalog:'Catalog', orders:'Orders', profile:'Profile',
-        rent:'Rent', sale:'Sale',
-        popular:'Popular', cheaper:'Cheapest', pricier:'Priciest', longer:'Longest',
-        search:'Search gifts…', load_more:'Load more',
-        rent_btn:'Rent', buy_btn:'Buy',
-        total:'Total', rent_days:'Rental period',
-        ton_payment:'Pay with TON',
-        connect_wallet:'Connect wallet', disconnect_wallet:'Disconnect',
-        ton_wallet:'TON Wallet',
-        filters:'Filters', reset_all:'Reset', apply_filters:'Apply',
-        collection:'Collection', model:'Model', backdrop:'Backdrop', symbol:'Symbol', all:'All',
-        view_on_fragment:'View NFT',
-        per_day:'/ day', price_label:'price',
-        topup_title:'💳 How to top up',
-        topup_desc:'Transfer TON to the address below or buy via Tonkeeper / @wallet',
-        copy_addr:'Copy address',
-        great:'Great!', about:'About', network:'Network', fee:'Fee',
-        language_label:'Language',
-        err_no_backend:'BACKEND_URL is not set — add window.BACKEND_URL to rent.html',
-        err_marketapp_setup:'Setup required: go to marketapp.ws, connect your wallet, and manually rent any NFT first.',
-        sign_tx:'Sign transaction…', confirming_net:'Confirming on-chain…',
-        creating_order:'Creating order…',
-        success_rent:'Rental confirmed!', success_sale:'Purchase confirmed!',
-        alerts_tab:'Alerts', alerts_calm:'All calm', alerts_no_threats:'No active threats',
-        alerts_no_threats_long:'No active threats. Stay safe.',
-        alerts_active:'Active threats', alerts_recent:'Recent attacks',
-        alerts_disclaimer:'⚠️ mapa.ua data is approximate. Don\'t use for safety decisions — follow official sources.',
-        legend_threat:'Threat', legend_city:'City',
-    },
-    ru: {
-        catalog:'Каталог', orders:'Заказы', profile:'Профиль',
-        rent:'Аренда', sale:'Продажа',
-        popular:'Популярные', cheaper:'Дешевле', pricier:'Дороже', longer:'Дольше',
-        search:'Поиск подарков…', load_more:'Загрузить ещё',
-        rent_btn:'Арендовать', buy_btn:'Купить',
-        total:'Итого', rent_days:'Срок аренды',
-        ton_payment:'Оплата TON',
-        connect_wallet:'Подключить кошелёк', disconnect_wallet:'Отключить кошелёк',
-        ton_wallet:'TON-кошелёк',
-        filters:'Фильтры', reset_all:'Сбросить', apply_filters:'Применить',
-        collection:'Коллекция', model:'Модель', backdrop:'Фон', symbol:'Символ', all:'Все',
-        view_on_fragment:'Смотреть NFT',
-        per_day:'/ день', price_label:'цена',
-        topup_title:'💳 Как пополнить кошелёк',
-        topup_desc:'Переведите TON на адрес ниже или купите через Tonkeeper / @wallet',
-        copy_addr:'Скопировать адрес',
-        great:'Отлично!', about:'О сервисе', network:'Сеть', fee:'Комиссия',
-        language_label:'Язык',
-        err_no_backend:'BACKEND_URL не задан — добавьте window.BACKEND_URL в rent.html',
-        err_marketapp_setup:'Настройте MarketApp: зайдите на marketapp.ws, подключите кошелёк и вручную арендуйте любой NFT.',
-        sign_tx:'Подпишите транзакцию…', confirming_net:'Подтверждение в сети…',
-        creating_order:'Создаём заказ…',
-        success_rent:'Аренда оформлена!', success_sale:'Покупка оформлена!',
-        alerts_tab:'Тревоги', alerts_calm:'Спокойно', alerts_no_threats:'Активных угроз нет',
-        alerts_no_threats_long:'Активных угроз нет. Берегите себя.',
-        alerts_active:'Активные угрозы', alerts_recent:'Последние атаки',
-        alerts_disclaimer:'⚠️ Данные mapa.ua приближённые. Не используйте для решений — следите за официальными источниками.',
-        legend_threat:'Угроза', legend_city:'Город',
-    },
-};
+    --ton:           #0098ea;
+    --ton-2:         #33b0ff;
+    --ton-dim:       rgba(0,152,234,0.11);
+    --ton-border:    rgba(0,152,234,0.30);
+    --ton-glow:      rgba(0,152,234,0.38);
 
-let lang = localStorage.getItem('gm_lang') || 'uk';
+    --text:          #f1f1f6;
+    --text-soft:     #c8c8d5;
+    --text-dim:      #86869a;
+    --text-muted:    #525268;
+    --text-faint:    #30303b;
 
-function t(key) {
-    return TR[lang]?.[key] ?? TR.uk[key] ?? key;
+    --green:         #10b981;
+    --green-dim:     rgba(16,185,129,0.11);
+    --orange:        #f59e0b;
+    --orange-dim:    rgba(245,158,11,0.11);
+
+    --radius:        22px;
+    --radius-sm:     14px;
+    --radius-xs:     9px;
+    --radius-lg:     28px;
+
+    --safe-bottom:   env(safe-area-inset-bottom, 0px);
+    --nav-h:         72px;
+
+    --font:    'Outfit', system-ui, -apple-system, sans-serif;
+    --font-en: 'Nunito', 'Outfit', system-ui, sans-serif;
+
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-snap:   cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-function applyLang() {
-    document.querySelectorAll('[data-i18n]').forEach(el => {
-        const k = el.dataset.i18n;
-        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.placeholder = t(k);
-        else el.textContent = t(k);
-    });
-    document.querySelectorAll('[data-i18n-ph]').forEach(el => {
-        el.placeholder = t(el.dataset.i18nPh);
-    });
-    document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
-    if ($('rent-btn-text') && state.selected) {
-        $('rent-btn-text').textContent = state.mode === 'rent' ? t('rent_btn') : t('buy_btn');
+/* ─── Reset ─────────────────────────────────────────────── */
+*, *::before, *::after {
+    margin: 0; padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html {
+    scroll-behavior: smooth;
+    height: 100%;
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100dvh;
+    overscroll-behavior: none;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: calc(var(--nav-h) + var(--safe-bottom));
+    background-image:
+        radial-gradient(ellipse 110% 40% at 50% 0%,  rgba(201,16,19,0.07) 0%, transparent 55%),
+        radial-gradient(ellipse 70%  28% at  8% 100%, rgba(46,141,224,0.04) 0%, transparent 55%);
+    background-attachment: fixed;
+}
+
+/* ─── Layout ─────────────────────────────────────────────── */
+.view { max-width: 480px; margin: 0 auto; }
+.hidden { display: none !important; }
+
+/* ─── HEADER ─────────────────────────────────────────────── */
+.r-header {
+    position: sticky; top: 0; z-index: 30;
+    background: rgba(6,6,8,0.92);
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    padding: 14px 16px 0;
+    border-bottom: 1px solid var(--border);
+    will-change: transform;
+    transition: transform 0.30s var(--ease-out);
+}
+.r-header.simple { padding-bottom: 14px; }
+.r-header.hide-scroll { transform: translateY(-102%); }
+
+.r-header-top {
+    display: flex; align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px; gap: 8px;
+}
+
+.r-brand { display: flex; align-items: center; gap: 10px; }
+
+.r-brand-dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 0 var(--accent-glow2);
+    animation: dot-pulse 2.5s infinite;
+    position: relative;
+}
+.r-brand-dot::after {
+    content: '';
+    position: absolute; inset: -4px;
+    border-radius: 50%;
+    background: var(--accent); opacity: 0;
+    animation: dot-ring 2.5s infinite;
+}
+@keyframes dot-pulse {
+    0%,100% { box-shadow: 0 0 6px 2px rgba(201,16,19,0.20); }
+    50%      { box-shadow: 0 0 16px 5px rgba(201,16,19,0.50); }
+}
+@keyframes dot-ring {
+    0%   { transform: scale(1);   opacity: 0.35; }
+    70%  { transform: scale(2.8); opacity: 0; }
+    100% { transform: scale(2.8); opacity: 0; }
+}
+
+.r-brand-name {
+    font-size: 22px; font-weight: 800;
+    letter-spacing: -0.5px; line-height: 1;
+}
+.accent {
+    color: var(--accent);
+    text-shadow: 0 0 22px var(--accent-glow), 0 0 48px rgba(201,16,19,0.12);
+}
+
+.ton-connect-slot { display: flex; align-items: center; min-height: 32px; }
+
+/* Search */
+.r-search-wrap {
+    position: relative; margin-bottom: 10px;
+    display: flex; align-items: center;
+}
+.r-search-ic {
+    position: absolute; left: 14px;
+    color: var(--text-muted); pointer-events: none;
+}
+#search-input {
+    width: 100%;
+    background: var(--glass-btn);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    padding: 11px 48px 11px 40px;
+    color: var(--text);
+    font-family: var(--font); font-size: 14px; outline: none;
+    transition: border-color 0.22s, box-shadow 0.22s;
+}
+#search-input:focus {
+    border-color: var(--accent-border);
+    box-shadow: 0 0 0 3px var(--accent-dim);
+}
+#search-input::placeholder { color: var(--text-faint); }
+.search-shortcut {
+    position: absolute; right: 14px;
+    font-size: 10px; color: var(--text-faint);
+    background: var(--surface-3); border: 1px solid var(--border);
+    border-radius: 5px; padding: 2px 5px;
+    font-family: var(--font-en); font-weight: 600;
+    pointer-events: none;
+}
+
+/* Mode tabs */
+.r-mode-tabs {
+    display: flex; gap: 5px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 15px;
+    padding: 4px; margin-bottom: 12px;
+}
+.r-tab {
+    flex: 1; padding: 9px 0;
+    border: none; border-radius: 11px;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--font); font-size: 13.5px; font-weight: 600;
+    cursor: pointer;
+    transition: background 0.22s var(--ease-out), color 0.22s, box-shadow 0.22s;
+}
+.r-tab.active {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 2px 18px var(--accent-glow2);
+}
+
+/* Sort chips */
+.r-filters-row {
+    display: flex; align-items: center;
+    gap: 8px; padding-bottom: 12px;
+}
+.r-sort-chips {
+    display: flex; gap: 6px;
+    overflow-x: auto; flex: 1;
+    scrollbar-width: none;
+}
+.r-sort-chips::-webkit-scrollbar { display: none; }
+
+.sort-chip {
+    flex-shrink: 0;
+    padding: 6px 13px;
+    border-radius: 20px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-btn);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    color: var(--text-muted);
+    font-family: var(--font); font-size: 12.5px; font-weight: 500;
+    cursor: pointer; transition: all 0.18s;
+    white-space: nowrap;
+}
+.sort-chip.active {
+    background: var(--accent-dim);
+    border-color: var(--accent-border);
+    color: var(--accent-3);
+    box-shadow: 0 0 14px var(--accent-dim);
+}
+.sort-chip:hover:not(.active) {
+    background: var(--glass-hi); border-color: var(--border-hi); color: var(--text-soft);
+}
+
+.filter-toggle-btn {
+    flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-btn);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    color: var(--text-dim); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.18s; position: relative;
+}
+.filter-toggle-btn:hover {
+    border-color: var(--accent-border); color: var(--accent-3);
+    box-shadow: 0 0 14px var(--accent-dim);
+}
+.filter-active-dot {
+    position: absolute; top: 3px; right: 3px;
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 7px var(--accent-glow);
+    border: 1.5px solid var(--bg);
+}
+
+/* ─── CATALOG STATS BAR ──────────────────────────────────── */
+.catalog-stats-bar {
+    display: flex; align-items: center; flex-wrap: wrap;
+    gap: 6px; padding: 8px 16px 4px;
+    font-size: 11.5px; color: var(--text-muted);
+    font-family: var(--font-en);
+}
+.catalog-stats-bar[hidden] { display: none; }
+.catalog-stats-count { font-weight: 700; color: var(--text-dim); }
+.catalog-stats-sep { opacity: 0.3; margin: 0 2px; }
+.stats-filter-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--accent-dim); border: 1px solid var(--accent-border);
+    color: var(--accent-3); border-radius: 10px; padding: 1px 8px;
+    font-size: 10.5px; font-weight: 700;
+}
+.stats-filter-tag button {
+    background: transparent; border: none; color: inherit;
+    cursor: pointer; font-size: 14px; line-height: 1;
+    padding: 0; opacity: 0.65; transition: opacity 0.15s;
+}
+.stats-filter-tag button:hover { opacity: 1; }
+
+/* ─── GIFT GRID ──────────────────────────────────────────── */
+.gifts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 11px;
+    padding: 10px 14px 8px;
+}
+
+/* ─── GIFT CARD ──────────────────────────────────────────── */
+.gift-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    overflow: hidden; cursor: pointer;
+    transition: transform 0.18s var(--ease-out), border-color 0.22s, box-shadow 0.22s;
+    user-select: none; position: relative;
+    animation: cardIn 0.42s var(--ease-out) both;
+    will-change: transform;
+}
+.gift-card:active { transform: scale(0.952); }
+.gift-card:hover {
+    border-color: var(--accent-border);
+    box-shadow: 0 0 0 1px var(--accent-border), 0 12px 40px rgba(0,0,0,0.6), 0 0 36px var(--accent-dim);
+}
+/* Shine sweep on hover */
+.gift-card::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.06) 50%, transparent 60%);
+    transform: translateX(-100%);
+    pointer-events: none; border-radius: var(--radius); z-index: 10;
+}
+.gift-card:hover::after { transform: translateX(200%); transition: transform 0.6s ease; }
+
+@keyframes cardIn {
+    from { opacity: 0; transform: translateY(18px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+/* Image wrap */
+.gift-card-img-wrap {
+    position: relative; width: 100%; padding-top: 110%;
+    background: linear-gradient(145deg, #0e0f14, #141620);
+    overflow: hidden;
+}
+.gift-card-img {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s var(--ease-out), filter 0.5s;
+    will-change: transform;
+}
+.gift-card:hover .gift-card-img { transform: scale(1.08); filter: brightness(1.05); }
+
+.gift-card-placeholder {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 50% 55%, #151620, #0c0d12);
+}
+.gift-card-placeholder svg { width: 44px; height: 44px; opacity: 0.14; }
+
+/* Gradient overlays */
+.gift-card-img-overlay {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 75%;
+    background: linear-gradient(to top,
+        rgba(0,0,0,0.98) 0%, rgba(0,0,0,0.72) 38%,
+        rgba(0,0,0,0.18) 68%, transparent 100%);
+    pointer-events: none;
+}
+.gift-card-img-glow {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 50%;
+    background: linear-gradient(to top, var(--accent-dim), transparent);
+    opacity: 0; transition: opacity 0.32s;
+    pointer-events: none;
+}
+.gift-card:hover .gift-card-img-glow { opacity: 1; }
+
+/* Badges */
+.gift-card-days-badge {
+    position: absolute; top: 8px; left: 8px;
+    background: rgba(0,0,0,0.68);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 8px; padding: 3px 7px;
+    font-size: 9px; font-weight: 700; color: rgba(255,255,255,0.72);
+    letter-spacing: 0.3px; font-family: var(--font-en);
+}
+.gift-card-ton-badge {
+    position: absolute; top: 8px; right: 8px;
+    background: rgba(46,141,224,0.18);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(46,141,224,0.30);
+    border-radius: 8px; padding: 3px 7px;
+    font-size: 9px; font-weight: 800; color: var(--ton-2);
+    font-family: var(--font-en);
+}
+.card-discount {
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+    background: linear-gradient(135deg, var(--accent-2), var(--accent));
+    color: #fff; border-radius: 8px; padding: 2px 7px;
+    font-size: 9px; font-weight: 800;
+    font-family: var(--font-en); letter-spacing: 0.2px;
+    box-shadow: 0 2px 10px var(--accent-glow2);
+    pointer-events: none; z-index: 2;
+}
+
+/* Card content overlay */
+.gift-card-over {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    padding: 10px 10px 9px;
+}
+.gift-card-name {
+    font-size: 12px; font-weight: 700; line-height: 1.3;
+    margin-bottom: 3px; color: #fff;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    text-shadow: 0 1px 10px rgba(0,0,0,0.95);
+    font-family: var(--font-en);
+}
+
+/* Attribute chips on card */
+.card-attrs {
+    display: flex; gap: 3px; flex-wrap: nowrap;
+    margin-bottom: 5px; overflow: hidden;
+}
+.card-attr {
+    font-size: 8.5px; font-weight: 700;
+    font-family: var(--font-en);
+    padding: 1px 5px; border-radius: 5px;
+    background: rgba(255,255,255,0.09);
+    border: 1px solid rgba(255,255,255,0.11);
+    color: rgba(255,255,255,0.52);
+    letter-spacing: 0.15px;
+    white-space: nowrap;
+    max-width: 56px; overflow: hidden; text-overflow: ellipsis;
+}
+
+.gift-card-price-row {
+    display: flex; align-items: center;
+    justify-content: space-between; gap: 4px;
+}
+.gift-card-ton {
+    font-size: 13px; font-weight: 800; color: var(--ton-2);
+    text-shadow: 0 0 14px rgba(46,141,224,0.40);
+    display: flex; align-items: baseline; gap: 2px;
+    font-family: var(--font-en); line-height: 1;
+}
+.gift-card-ton .cur-label { font-size: 8.5px; opacity: 0.60; font-weight: 600; }
+.gift-card-uah {
+    font-size: 10px; font-weight: 700;
+    color: rgba(255,255,255,0.40); line-height: 1;
+}
+
+/* Rent button */
+.gift-card-rent-btn {
+    display: block; width: 100%; padding: 9px 0;
+    background: var(--glass-btn);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: none; border-top: 1px solid rgba(201,16,19,0.18);
+    border-radius: 0 0 var(--radius) var(--radius);
+    color: rgba(255,255,255,0.65);
+    font-family: var(--font); font-size: 11.5px; font-weight: 700;
+    text-align: center; cursor: pointer;
+    transition: background 0.22s, color 0.22s;
+    letter-spacing: 0.3px; position: relative; overflow: hidden;
+}
+.gift-card-rent-btn::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, var(--accent-2) 0%, #880b0d 100%);
+    opacity: 0; transition: opacity 0.22s;
+}
+.gift-card-rent-btn:hover::before { opacity: 1; }
+.gift-card-rent-btn:hover { color: #fff; }
+.gift-card-rent-btn span { position: relative; z-index: 1; }
+
+/* ─── SKELETON ───────────────────────────────────────────── */
+.gift-skeleton {
+    border-radius: var(--radius); height: 242px;
+    border: 1px solid var(--border); overflow: hidden;
+    position: relative; background: var(--surface);
+}
+.gift-skeleton::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(110deg, transparent 25%, rgba(255,255,255,0.032) 50%, transparent 75%);
+    background-size: 200% 100%;
+    animation: skel 1.6s linear infinite;
+}
+.gift-skeleton.wide { height: 86px; margin: 0 14px 10px; border-radius: var(--radius-sm); }
+@keyframes skel {
+    from { background-position: 200% 0; }
+    to   { background-position: -200% 0; }
+}
+
+/* ─── LOAD MORE ──────────────────────────────────────────── */
+.load-more-wrap { display: flex; justify-content: center; padding: 6px 16px 16px; }
+.load-more-btn {
+    padding: 12px 36px;
+    background: var(--glass-btn);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border);
+    border-radius: 22px; color: var(--text-dim);
+    font-family: var(--font); font-size: 13px; cursor: pointer;
+    transition: all 0.22s;
+}
+.load-more-btn:hover { border-color: var(--accent-border); color: var(--text); box-shadow: 0 0 18px var(--accent-dim); }
+
+/* ─── STATE CELLS ────────────────────────────────────────── */
+.state-cell {
+    grid-column: 1 / -1;
+    display: flex; flex-direction: column;
+    align-items: center; padding: 60px 24px; gap: 12px; text-align: center;
+}
+.state-icon { font-size: 54px; animation: float 3s ease-in-out infinite; }
+@keyframes float {
+    0%,100% { transform: translateY(0); }
+    50%      { transform: translateY(-8px); }
+}
+.state-title { font-size: 17px; font-weight: 700; }
+.state-desc  { font-size: 13px; color: var(--text-dim); line-height: 1.55; max-width: 240px; }
+.state-btn {
+    margin-top: 6px; padding: 10px 28px;
+    background: var(--glass-btn);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--accent-border);
+    border-radius: 22px; color: var(--text);
+    font-family: var(--font); font-size: 13px;
+    cursor: pointer; transition: all 0.18s;
+}
+.state-btn:hover { background: var(--accent-soft); }
+
+/* ─── BOTTOM NAV ─────────────────────────────────────────── */
+.bottom-nav {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+    display: flex; max-width: 480px; margin: 0 auto;
+    background: rgba(6,6,8,0.96);
+    backdrop-filter: blur(32px) saturate(200%);
+    -webkit-backdrop-filter: blur(32px) saturate(200%);
+    border-top: 1px solid var(--border);
+    padding: 5px 0 calc(8px + var(--safe-bottom));
+}
+
+/* Full-width fix for nav */
+.bottom-nav { max-width: none; }
+
+.nav-btn {
+    flex: 1; background: transparent; border: none;
+    color: var(--text-faint);
+    display: flex; flex-direction: column;
+    align-items: center; gap: 3px;
+    padding: 5px 0 3px;
+    font-family: var(--font); font-size: 9.5px; font-weight: 600;
+    cursor: pointer; transition: color 0.22s; position: relative;
+}
+.nav-icon { display: flex; align-items: center; justify-content: center; height: 26px; position: relative; }
+.nav-icon svg { transition: transform 0.22s var(--ease-spring); will-change: transform; }
+.nav-label { transition: color 0.22s; }
+
+.nav-btn.active { color: var(--accent); }
+.nav-btn.active svg { transform: scale(1.12) translateY(-1px); filter: drop-shadow(0 0 5px var(--accent-glow)); }
+
+.nav-btn::after {
+    content: '';
+    position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 18px; height: 2.5px;
+    background: var(--accent); border-radius: 2px;
+    opacity: 0; transition: opacity 0.22s, width 0.22s var(--ease-spring);
+}
+.nav-btn.active::after { opacity: 1; width: 26px; }
+
+.nav-alerts { position: relative; }
+.nav-alert-dot {
+    position: absolute; top: 4px; right: calc(50% - 17px);
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent-2);
+    box-shadow: 0 0 7px var(--accent-glow);
+    border: 2px solid var(--bg);
+    animation: dot-pulse 1.8s infinite; z-index: 1;
+}
+
+/* ─── ALERTS HEADER ──────────────────────────────────────── */
+.alerts-hdr {
+    position: sticky; top: 0; z-index: 30;
+    background: rgba(6,6,8,0.92);
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+}
+
+.alerts-status-banner {
+    display: flex; align-items: center; gap: 12px;
+    background: linear-gradient(135deg, var(--green-dim), rgba(46,204,113,0.03));
+    border: 1px solid rgba(46,204,113,0.28);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    transition: all 0.35s var(--ease-out);
+    position: relative; overflow: hidden;
+}
+.alerts-status-banner::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.02) 50%, transparent 100%);
+    animation: banner-shimmer 4s ease-in-out infinite;
+}
+@keyframes banner-shimmer {
+    0%,100% { opacity: 0; }
+    50%      { opacity: 1; }
+}
+
+.alerts-status-banner.danger {
+    background: linear-gradient(135deg, rgba(201,16,19,0.18), rgba(201,16,19,0.05));
+    border-color: var(--accent-border);
+    animation: alarm-pulse 2.5s infinite;
+}
+@keyframes alarm-pulse {
+    0%,100% { box-shadow: none; }
+    50%      { box-shadow: 0 0 0 6px rgba(201,16,19,0.07); }
+}
+
+.status-dot {
+    width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+    background: var(--green); box-shadow: 0 0 10px var(--green);
+    position: relative;
+}
+.status-dot::after {
+    content: '';
+    position: absolute; inset: -4px; border-radius: 50%;
+    background: var(--green); opacity: 0;
+    animation: dot-ring 2.5s infinite;
+}
+.alerts-status-banner.danger .status-dot {
+    background: var(--accent-2); box-shadow: 0 0 14px var(--accent-glow);
+}
+.alerts-status-banner.danger .status-dot::after { background: var(--accent-2); animation-duration: 1.4s; }
+
+.status-text { flex: 1; min-width: 0; }
+.status-title {
+    font-size: 15px; font-weight: 800; line-height: 1.2;
+}
+.alerts-status-banner:not(.danger) .status-title { color: var(--green); }
+.alerts-status-banner.danger .status-title       { color: var(--accent-3); }
+.status-sub { font-size: 11.5px; color: var(--text-dim); margin-top: 2px; }
+
+.icon-btn {
+    width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-btn);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    color: var(--text-dim); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+}
+.icon-btn:hover { color: var(--text); border-color: var(--border-hi); }
+.icon-btn.spin svg { animation: spin 0.7s linear; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── ALERTS BODY ────────────────────────────────────────── */
+.alerts-body { padding: 10px 0 24px; }
+
+/* ─── MAP ────────────────────────────────────────────────── */
+.map-container {
+    position: relative;
+    margin: 0 14px 14px;
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: #060a12;
+    border: 1px solid rgba(255,255,255,0.08);
+    aspect-ratio: 1000 / 660;
+    box-shadow:
+        0 2px 8px rgba(0,0,0,0.4),
+        0 8px 40px rgba(0,0,0,0.6),
+        inset 0 0 60px rgba(0,0,0,0.4),
+        inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.map-bg-glow {
+    position: absolute; inset: 0; pointer-events: none; z-index: 1;
+    background:
+        radial-gradient(ellipse 70% 55% at 45% 38%, rgba(46,141,224,0.06) 0%, transparent 65%),
+        radial-gradient(ellipse 55% 65% at 62% 72%, rgba(201,16,19,0.035) 0%, transparent 55%),
+        radial-gradient(ellipse 40% 40% at 30% 60%, rgba(46,141,224,0.03) 0%, transparent 50%);
+}
+
+.alerts-map {
+    width: 100%; height: 100%; display: block;
+    position: relative; z-index: 2;
+    touch-action: none; user-select: none; cursor: grab;
+}
+.alerts-map.dragging { cursor: grabbing; }
+
+/* SVG map elements — premium oblast styling */
+.ua-region {
+    fill: rgba(18, 28, 48, 0.65);
+    stroke: rgba(100, 160, 230, 0.18);
+    stroke-width: 1;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    transition: fill 0.35s ease, stroke 0.35s ease, filter 0.35s ease;
+    cursor: pointer;
+}
+
+/* Alternating fill for visual differentiation between oblasts */
+.ua-region:nth-child(odd) {
+    fill: rgba(22, 34, 56, 0.6);
+}
+.ua-region:nth-child(even) {
+    fill: rgba(16, 26, 44, 0.68);
+}
+
+/* Western oblasts — slightly cooler tone */
+#volyn, #rivne, #lviv, #ternopil, #ivano-frankivsk, #zakarpattia {
+    fill: rgba(18, 30, 54, 0.62);
+}
+
+/* Central oblasts — subtle warm shift */
+#kyiv, #kyiv-city, #cherkasy, #poltava, #kirovohrad {
+    fill: rgba(20, 32, 52, 0.65);
+}
+
+/* Eastern oblasts — slightly different shade for occupied/frontline contrast */
+#donetsk, #luhansk {
+    fill: rgba(24, 28, 42, 0.55);
+}
+
+/* Crimea — special occupied territory styling */
+#crimea {
+    fill: rgba(20, 24, 38, 0.45);
+}
+
+.ua-region:hover {
+    fill: rgba(60, 130, 220, 0.18);
+    stroke: rgba(100, 180, 255, 0.4);
+    filter: drop-shadow(0 0 6px rgba(60, 130, 220, 0.15));
+}
+
+.ua-region.alert {
+    fill: rgba(201, 16, 19, 0.22) !important;
+    stroke: rgba(255, 60, 60, 0.6) !important;
+    animation: regionPulse 3s infinite ease-in-out;
+}
+
+@keyframes regionPulse {
+    0%, 100% {
+        fill: rgba(201, 16, 19, 0.18);
+        stroke: rgba(255, 60, 60, 0.45);
+        filter: none;
     }
-    $('modal-ppd-label').textContent = state.mode === 'rent' ? t('per_day') : t('price_label');
-    $('modal-disclaimer').textContent = t('ton_payment') + ': NFT зараховується на ваш акаунт після підтвердження.';
-}
-
-// ─── Telegram ────────────────────────────────────────────────────────────────
-
-if (tg) {
-    tg.ready(); tg.expand();
-    tg.setHeaderColor?.('#080808');
-    tg.setBackgroundColor?.('#080808');
-    tg.enableClosingConfirmation?.();
-}
-
-// ─── TonConnect ──────────────────────────────────────────────────────────────
-
-let tonConnectUI = null;
-try {
-    if (window.TON_CONNECT_UI) {
-        tonConnectUI = new window.TON_CONNECT_UI.TonConnectUI({
-            manifestUrl: window.TONCONNECT_MANIFEST,
-            buttonRootId: 'ton-connect',
-        });
-        tonConnectUI.onStatusChange?.(refreshWalletUi);
-    }
-} catch (e) { console.warn('TonConnect init failed:', e); }
-
-// ─── State ───────────────────────────────────────────────────────────────────
-
-const state = {
-    tab: 'catalog',
-    mode: 'rent',
-    sort: 'popular',
-    method: 'tonconnect',
-    query: '',
-    items: [],
-    cursor: null,
-    hasMore: false,
-    loading: false,
-    selected: null,
-    duration: 7,
-    ordersKind: '',
-    filters: { model: null, backdrop: null, symbol: null },
-    filterOptions: { models: [], backdrops: [], symbols: [] },
-};
-
-// ─── DOM ──────────────────────────────────────────────────────────────────────
-
-const $  = id  => document.getElementById(id);
-const $$ = sel => document.querySelectorAll(sel);
-
-function esc(s) {
-    return String(s ?? '').replace(/[&<>"']/g, c =>
-        ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-}
-
-function pluralDays(n) {
-    n = Math.abs(n);
-    if (n === 1) return lang === 'en' ? 'day' : 'день';
-    if (lang === 'en') return 'days';
-    if (n >= 2 && n <= 4) return 'дні';
-    return 'днів';
-}
-
-function truncAddr(a) {
-    if (!a) return '';
-    return a.length > 14 ? `${a.slice(0,6)}…${a.slice(-4)}` : a;
-}
-
-function tonToUah(ton) {
-    const uah = Math.round(parseFloat(ton || 0) * TON_TO_UAH);
-    return uah.toLocaleString('uk-UA') + ' ₴';
-}
-
-// ─── API ──────────────────────────────────────────────────────────────────────
-
-function authHeaders() {
-    const h = { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' };
-    if (tg?.initData) h['X-Telegram-Init-Data'] = tg.initData;
-    return h;
-}
-
-async function api(path, options = {}) {
-    if (!BACKEND_URL) throw new Error(t('err_no_backend'));
-    const res = await fetch(`${BACKEND_URL}${path}`, {
-        ...options,
-        headers: { ...authHeaders(), ...(options.headers || {}) },
-    });
-    let body = {};
-    try { body = await res.json(); } catch { /* empty */ }
-    if (!res.ok) {
-        const msg = body?.error?.message || body?.detail || `HTTP ${res.status}`;
-        const err = new Error(msg);
-        err.code = body?.error?.code;
-        err.status = res.status;
-        throw err;
-    }
-    return body;
-}
-
-// ─── Toasts ───────────────────────────────────────────────────────────────────
-
-function toast(message, kind = 'info', ms = 3500) {
-    const ic = { success:'✅', error:'⚠️', info:'💬' }[kind] || '💬';
-    const el = document.createElement('div');
-    el.className = `toast ${kind}`;
-    el.innerHTML = `<span class="toast-ic">${ic}</span><span>${esc(message)}</span>`;
-    $('toasts').appendChild(el);
-    setTimeout(() => {
-        el.style.transition = 'opacity 0.25s, transform 0.25s';
-        el.style.opacity = '0';
-        el.style.transform = 'translateY(10px)';
-        setTimeout(() => el.remove(), 260);
-    }, ms);
-}
-
-function notify(msg, kind = 'info') {
-    if (tg && kind === 'error') tg.showAlert(msg);
-    else toast(msg, kind);
-}
-
-// ─── Scroll-hide header ───────────────────────────────────────────────────────
-
-let lastScrollY = 0, headerHidden = false;
-window.addEventListener('scroll', () => {
-    const y = window.scrollY;
-    if (state.tab !== 'catalog') return;
-    const hdr = $('catalog-header');
-    if (!hdr) return;
-    if (y > lastScrollY + 10 && !headerHidden) {
-        hdr.classList.add('hide-scroll');
-        headerHidden = true;
-    } else if (y < lastScrollY - 6 && headerHidden) {
-        hdr.classList.remove('hide-scroll');
-        headerHidden = false;
-    }
-    lastScrollY = y;
-}, { passive: true });
-
-// ─── Catalog ──────────────────────────────────────────────────────────────────
-
-async function loadItems(reset = false) {
-    if (state.loading) return;
-    state.loading = true;
-
-    if (reset) {
-        state.items = [];
-        state.cursor = null;
-        renderSkeletons();
-        window.scrollTo({ top: 0 });
-        if (headerHidden) { $('catalog-header')?.classList.remove('hide-scroll'); headerHidden = false; }
-    }
-
-    const params = new URLSearchParams({ sort: state.sort });
-    if (state.cursor) params.set('cursor', state.cursor);
-    if (state.filters.model)   params.set('model',   state.filters.model);
-    if (state.filters.backdrop) params.set('backdrop', state.filters.backdrop);
-    if (state.filters.symbol)  params.set('symbol',  state.filters.symbol);
-
-    const endpoint = state.mode === 'rent' ? '/api/rent/gifts' : '/api/sale/gifts';
-
-    try {
-        const data = await api(`${endpoint}?${params}`);
-        state.items.push(...(data.items || []));
-        state.cursor  = data.cursor || null;
-        state.hasMore = !!state.cursor;
-        extractFilterOptions();
-        renderGrid();
-    } catch (e) {
-        renderError(e.message);
-    } finally {
-        state.loading = false;
-        $('load-more-container').style.display = state.hasMore ? 'flex' : 'none';
-    }
-}
-
-function extractFilterOptions() {
-    const models   = new Set();
-    const backdrops = new Set();
-    const symbols  = new Set();
-    state.items.forEach(g => {
-        if (g.model)   models.add(g.model);
-        if (g.backdrop) backdrops.add(g.backdrop);
-        if (g.symbol)  symbols.add(g.symbol);
-    });
-    state.filterOptions.models   = [...models].sort();
-    state.filterOptions.backdrops = [...backdrops].sort();
-    state.filterOptions.symbols  = [...symbols].sort();
-}
-
-function renderSkeletons() {
-    $('gifts-grid').innerHTML = Array(6).fill('<div class="gift-skeleton"></div>').join('');
-    const bar = $('catalog-stats-bar');
-    if (bar) bar.hidden = true;
-}
-
-function visibleItems() {
-    const q = state.query.trim().toLowerCase();
-    if (!q) return state.items;
-    return state.items.filter(g =>
-        (g.name || '').toLowerCase().includes(q) ||
-        (g.nft_address || '').toLowerCase().includes(q));
-}
-
-function renderCatalogStats() {
-    const bar = $('catalog-stats-bar');
-    if (!bar) return;
-    const n = visibleItems().length;
-    if (!n) { bar.hidden = true; return; }
-
-    const wordForm = n === 1 ? 'подарунок' : (n >= 2 && n <= 4 ? 'подарунки' : 'подарунків');
-    let html = `<span class="catalog-stats-count">${n} ${wordForm}</span>`;
-
-    const activeF = Object.entries(state.filters).filter(([,v]) => v);
-    if (activeF.length) {
-        html += `<span class="catalog-stats-sep">•</span>`;
-        html += activeF.map(([k, v]) =>
-            `<span class="catalog-stats-filter-tag">${esc(t(k))}: ${esc(v)}
-             <button onclick="clearFilter('${esc(k)}')" aria-label="clear">×</button></span>`
-        ).join('');
-    }
-    bar.innerHTML = html;
-    bar.hidden = false;
-}
-
-window.clearFilter = function(key) {
-    state.filters[key] = null;
-    $('filter-active-dot').hidden = !hasActiveFilters();
-    loadItems(true);
-};
-
-function renderGrid() {
-    const grid  = $('gifts-grid');
-    const items = visibleItems();
-    if (!items.length) {
-        grid.innerHTML = stateCell('🎁',
-            state.query ? t('not_found') || 'Нічого не знайдено' : 'Каталог порожній',
-            state.query ? `«${esc(state.query)}»` : 'Спробуйте інший фільтр');
-        renderCatalogStats();
-        return;
-    }
-    grid.innerHTML = items.map((g, i) =>
-        state.mode === 'rent' ? rentCard(g, i) : saleCard(g, i)).join('');
-    grid.querySelectorAll('.gift-card').forEach(card => {
-        const idx = +card.dataset.idx;
-        card.addEventListener('click', () => openModal(items[idx]));
-    });
-    renderCatalogStats();
-}
-
-// Gift card placeholder SVG
-const PLACEHOLDER_SVG = `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M32 12c0-4 6-8 8-4s-2 8-8 8-10-4-8-8 8 0 8 4z" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
-  <path d="M12 22h40v4H12z" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
-  <path d="M14 26h36v22a4 4 0 01-4 4H18a4 4 0 01-4-4V26z" stroke="#fff" stroke-width="1.5"/>
-  <path d="M32 22v30" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
-</svg>`;
-
-function imgMarkup(g) {
-    return g.image_url
-        ? `<img class="gift-card-img" src="${esc(g.image_url)}" alt="${esc(g.name)}" loading="lazy"
-             onerror="this.style.display='none';this.nextElementSibling?.style.setProperty('display','flex')">`
-        : '';
-}
-
-function cardAttrChips(g) {
-    const attrs = [g.model, g.backdrop, g.symbol].filter(Boolean).slice(0, 3);
-    if (!attrs.length) return '';
-    return `<div class="card-attrs">${attrs.map(a =>
-        `<span class="card-attr">${esc(a)}</span>`).join('')}</div>`;
-}
-
-function rentCard(g, i) {
-    const uah = tonToUah(g.price_per_day_ton);
-    const discount = g.discount_per_day ? Math.round(g.discount_per_day * 100) : 0;
-    const discBadge = discount > 0
-        ? `<div class="card-discount">-${discount}%</div>` : '';
-    return `
-    <div class="gift-card" data-idx="${i}" role="button" tabindex="0" style="--i:${i}">
-        <div class="gift-card-img-wrap">
-            ${imgMarkup(g)}
-            <div class="gift-card-placeholder" style="${g.image_url ? 'display:none' : ''}">${PLACEHOLDER_SVG}</div>
-            <div class="gift-card-img-overlay"></div>
-            <div class="gift-card-img-glow"></div>
-            <div class="gift-card-days-badge">${g.min_duration_days}–${g.max_duration_days}d</div>
-            <div class="gift-card-ton-badge">◈ ${g.price_per_day_ton}</div>
-            ${discBadge}
-            <div class="gift-card-over">
-                <div class="gift-card-name">${esc(g.name)}</div>
-                ${cardAttrChips(g)}
-                <div class="gift-card-price-row">
-                    <span class="gift-card-ton">◈ ${g.price_per_day_ton}<span class="cur-label">TON/d</span></span>
-                    <span class="gift-card-uah">${uah}</span>
-                </div>
-            </div>
-        </div>
-        <button class="gift-card-rent-btn" tabindex="-1"><span>${t('rent_btn')}</span></button>
-    </div>`;
-}
-
-function saleCard(g, i) {
-    const cur = g.currency || 'TON';
-    const uah = tonToUah(g.price_with_markup);
-    return `
-    <div class="gift-card" data-idx="${i}" role="button" tabindex="0" style="--i:${i}">
-        <div class="gift-card-img-wrap">
-            ${imgMarkup(g)}
-            <div class="gift-card-placeholder" style="${g.image_url ? 'display:none' : ''}">${PLACEHOLDER_SVG}</div>
-            <div class="gift-card-img-overlay"></div>
-            <div class="gift-card-img-glow"></div>
-            <div class="gift-card-ton-badge">◈ ${g.price_with_markup}</div>
-            <div class="gift-card-over">
-                <div class="gift-card-name">${esc(g.name)}</div>
-                ${cardAttrChips(g)}
-                <div class="gift-card-price-row">
-                    <span class="gift-card-ton">◈ ${g.price_with_markup}<span class="cur-label">${esc(cur)}</span></span>
-                    <span class="gift-card-uah">${uah}</span>
-                </div>
-            </div>
-        </div>
-        <button class="gift-card-rent-btn" tabindex="-1"><span>${t('buy_btn')}</span></button>
-    </div>`;
-}
-
-function stateCell(icon, title, desc, withRetry = false) {
-    return `<div class="state-cell">
-        <div class="state-icon">${icon}</div>
-        <div class="state-title">${esc(title)}</div>
-        <div class="state-desc">${esc(desc)}</div>
-        ${withRetry ? `<button class="state-btn" onclick="window.__reload()">${t('load_more')}</button>` : ''}
-    </div>`;
-}
-
-function renderError(msg) {
-    $('gifts-grid').innerHTML = stateCell('⚠️', 'Помилка завантаження', msg || '', true);
-}
-window.__reload = () => loadItems(true);
-
-// ─── Filter sheet ─────────────────────────────────────────────────────────────
-
-function hasActiveFilters() {
-    return !!(state.filters.model || state.filters.backdrop || state.filters.symbol);
-}
-
-function openFilterSheet() {
-    buildFilterSheet();
-    $('filter-sheet').hidden = false;
-    if (tg) tg.HapticFeedback?.impactOccurred('light');
-}
-
-function closeFilterSheet() { $('filter-sheet').hidden = true; }
-
-function buildFilterSheet() {
-    const body = $('filter-sheet-body');
-    const sections = [
-        { key: 'model',   label: t('model'),   opts: state.filterOptions.models   },
-        { key: 'backdrop', label: t('backdrop'), opts: state.filterOptions.backdrops },
-        { key: 'symbol',  label: t('symbol'),  opts: state.filterOptions.symbols  },
-    ];
-    body.innerHTML = sections.map(sec => {
-        if (!sec.opts.length) return '';
-        const chips = [{ val: null, label: t('all') }, ...sec.opts.map(v => ({ val: v, label: v }))]
-            .map(o => {
-                const active = state.filters[sec.key] === o.val;
-                return `<button class="fs-chip${active ? ' active' : ''}"
-                    data-sec="${esc(sec.key)}" data-val="${esc(o.val ?? '')}">${esc(o.label)}</button>`;
-            }).join('');
-        return `<div>
-            <div class="fs-section-title">${esc(sec.label)}</div>
-            <div class="fs-chips">${chips}</div>
-        </div>`;
-    }).join('');
-
-    body.querySelectorAll('.fs-chip').forEach(chip => {
-        chip.addEventListener('click', () => {
-            const sec = chip.dataset.sec;
-            const val = chip.dataset.val || null;
-            state.filters[sec] = val;
-            body.querySelectorAll(`.fs-chip[data-sec="${sec}"]`).forEach(c =>
-                c.classList.toggle('active', c.dataset.val === (val || '')));
-            if (tg) tg.HapticFeedback?.selectionChanged();
-        });
-    });
-}
-
-$('filter-btn').addEventListener('click', openFilterSheet);
-
-$('filter-sheet').addEventListener('click', e => {
-    if (e.target === $('filter-sheet')) closeFilterSheet();
-});
-
-$('filter-reset-btn').addEventListener('click', () => {
-    state.filters = { model: null, backdrop: null, symbol: null };
-    buildFilterSheet();
-    $('filter-active-dot').hidden = true;
-    if (tg) tg.HapticFeedback?.selectionChanged();
-});
-
-$('filter-apply-btn').addEventListener('click', () => {
-    closeFilterSheet();
-    $('filter-active-dot').hidden = !hasActiveFilters();
-    loadItems(true);
-    if (tg) tg.HapticFeedback?.impactOccurred('medium');
-});
-
-// ─── Modal ─────────────────────────────────────────────────────────────────────
-
-function openModal(item) {
-    state.selected = item;
-    const isRent = state.mode === 'rent';
-
-    $('modal-img').src = item.image_url || '';
-    $('modal-name').textContent = item.name || 'Gift';
-    $('modal-addr').textContent = truncAddr(item.nft_address);
-
-    $('duration-section').style.display = isRent ? 'block' : 'none';
-
-    if (isRent) {
-        state.duration = item.min_duration_days || 1;
-        $('modal-ppd-stars').textContent = `◈ ${item.price_per_day_ton} TON`;
-        $('modal-ppd-label').textContent = t('per_day');
-        const sl = $('duration-slider');
-        sl.min = item.min_duration_days || 1;
-        sl.max = item.max_duration_days || 30;
-        sl.value = state.duration;
-        updateSliderFill(sl);
-        $('duration-min-label').textContent = `${item.min_duration_days} d`;
-        $('duration-max-label').textContent = `${item.max_duration_days} d`;
-    } else {
-        $('modal-ppd-stars').textContent = `◈ ${item.price_with_markup} ${item.currency || 'TON'}`;
-        $('modal-ppd-label').textContent = t('price_label');
-    }
-
-    $('rent-btn-text').textContent = isRent ? t('rent_btn') : t('buy_btn');
-
-    // Build attribute chips + Fragment link
-    buildNftAttrs(item);
-
-    hideModalError();
-    refreshTotals();
-    showTopupHint(false);
-    $('rental-modal').hidden = false;
-
-    if (tg) {
-        tg.HapticFeedback?.impactOccurred('light');
-        tg.BackButton.show();
-        tg.BackButton.onClick(closeModal);
-    }
-}
-
-function buildNftAttrs(item) {
-    const container = $('nft-attrs');
-    const pairs = [
-        ['Collection', item.collection_name],
-        ['Model',   item.model],
-        ['Backdrop', item.backdrop],
-        ['Symbol',  item.symbol],
-    ].filter(([, v]) => v);
-
-    const chips = pairs.map(([k, v]) =>
-        `<div class="nft-attr-chip"><span class="attr-key">${esc(k)}</span><span class="attr-val">${esc(v)}</span></div>`
-    ).join('');
-
-    const fragSlug = fragmentSlug(item.name);
-    const fragLink = item.nft_address
-        ? `<a class="nft-fragment-link" href="https://tonscan.org/nft/${esc(item.nft_address)}" target="_blank" rel="noopener">
-               <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-                   <path d="M7 3H3a1 1 0 00-1 1v9a1 1 0 001 1h9a1 1 0 001-1V9"/><path d="M10 2h4v4"/><path d="M14 2L8 8"/>
-               </svg>
-               ${t('view_on_fragment')}
-           </a>`
-        : '';
-
-    container.innerHTML = chips + fragLink;
-    container.style.display = (chips || fragLink) ? '' : 'none';
-}
-
-function fragmentSlug(name) {
-    if (!name || !name.includes('#')) return null;
-    const [namePart, numPart] = name.split('#');
-    return namePart.trim().toLowerCase().replace(/\s+/g, '').replace(/-/g, '');
-}
-
-function closeModal() {
-    $('rental-modal').hidden = true;
-    state.selected = null;
-    hideModalError();
-    setRentBtnLoading(false);
-    if (tg) tg.BackButton.hide();
-}
-
-function showModalError(title, desc) {
-    const box = $('modal-error');
-    if (!box) return;
-    $('modal-error-title').textContent = title || '';
-    $('modal-error-desc').textContent  = desc  || '';
-    box.hidden = false;
-    box.style.animation = 'none';
-    void box.offsetWidth;
-    box.style.animation = '';
-}
-
-function hideModalError() {
-    const box = $('modal-error');
-    if (box) box.hidden = true;
-}
-
-function setRentBtnLoading(on, text) {
-    const btn = $('rent-btn');
-    if (!btn) return;
-    btn.disabled = !!on;
-    btn.classList.toggle('loading', !!on);
-    if (text) $('rent-btn-text').textContent = text;
-}
-
-function refreshTotals() {
-    const g = state.selected;
-    if (!g) return;
-
-    const sec = document.querySelector('.totals-box');
-    if (sec) { sec.classList.remove('bump'); void sec.offsetWidth; sec.classList.add('bump'); }
-
-    if (state.mode === 'rent') {
-        const days = state.duration;
-        let total = g.price_per_day_ton * days;
-        if (days > 1 && g.discount_per_day) total *= (1 - g.discount_per_day);
-        total = Math.round(total * 1000) / 1000;
-        $('duration-display').textContent = `${days} ${pluralDays(days)}`;
-        $('total-ton').textContent  = `◈ ${total} TON`;
-        $('total-stars').textContent = `≈ ${tonToUah(total)}`;
-        const dr = $('discount-row');
-        if (days > 1 && g.discount_per_day) {
-            $('discount-text').textContent = `🎉 Знижка ${Math.round(g.discount_per_day * 100)}%`;
-            dr.style.display = 'block';
-        } else dr.style.display = 'none';
-    } else {
-        $('total-ton').textContent  = `◈ ${g.price_with_markup} ${g.currency || 'TON'}`;
-        $('total-stars').textContent = `≈ ${tonToUah(g.price_with_markup)}`;
-        $('discount-row').style.display = 'none';
-    }
-}
-
-function updateSliderFill(sl) {
-    const min = +sl.min, max = +sl.max, val = +sl.value;
-    const pct = max > min ? ((val - min) / (max - min)) * 100 : 0;
-    sl.style.background =
-        `linear-gradient(to right, var(--accent) 0%, var(--accent) ${pct}%, var(--surface-3) ${pct}%, var(--surface-3) 100%)`;
-}
-
-// ─── Checkout ──────────────────────────────────────────────────────────────────
-
-async function checkout() {
-    const g = state.selected;
-    if (!g) return;
-
-    const original = state.mode === 'rent' ? t('rent_btn') : t('buy_btn');
-    hideModalError();
-    setRentBtnLoading(true, t('creating_order'));
-    if (tg) tg.HapticFeedback?.impactOccurred('medium');
-
-    try {
-        const endpoint = state.mode === 'rent' ? '/api/rent/checkout' : '/api/sale/checkout';
-        const body = state.mode === 'rent'
-            ? { nft_address: g.nft_address, duration_days: state.duration, method: state.method }
-            : { nft_address: g.nft_address, method: state.method };
-        const resp = await api(endpoint, { method: 'POST', body: JSON.stringify(body) });
-
-        if (resp.method === 'stars') await payWithStars(resp, g, original);
-        else                         await payWithTon(resp, g, original);
-    } catch (e) {
-        console.error('Checkout failed:', e);
-        setRentBtnLoading(false, original);
-        showCheckoutError(e);
-        if (tg) tg.HapticFeedback?.notificationOccurred('error');
-    }
-}
-
-function showCheckoutError(e) {
-    const status = e.status || 0;
-    const msg = e.message || '';
-    let title, desc;
-
-    if (status === 401 || /init data|telegram/i.test(msg)) {
-        title = 'Потрібен Telegram'; desc = 'Відкрийте Mini App через бота Telegram.';
-    } else if (/manually|same wallet|api toke/i.test(msg)) {
-        title = 'Налаштуйте MarketApp'; desc = t('err_marketapp_setup');
-    } else if (status === 404 || /no longer|unavailable|недост/i.test(msg)) {
-        title = 'Подарунок недоступний'; desc = 'Спробуйте інший або оновіть каталог.';
-    } else if (status === 429 || /rate|обмежує/i.test(msg)) {
-        title = 'Забагато запитів'; desc = 'Зачекайте 15 секунд і спробуйте знову.';
-    } else if (/fetch|network|backend_url/i.test(msg)) {
-        title = 'Немає зв\'язку'; desc = 'Перевірте, що ngrok запущено і BACKEND_URL актуальний.';
-    } else {
-        title = 'Помилка MarketApp'; desc = msg.slice(0, 200);
-    }
-    showModalError(title, desc);
-}
-
-function showTopupHint(show) {
-    const hint = $('topup-hint');
-    if (!hint) return;
-    hint.style.display = show ? 'block' : 'none';
-    if (show && MERCHANT_WALLET) $('topup-addr').textContent = MERCHANT_WALLET;
-}
-
-async function payWithTon(resp, g, original) {
-    if (!tonConnectUI) {
-        setRentBtnLoading(false, original);
-        showTopupHint(true);
-        showModalError('TonConnect недоступний', 'Оновіть сторінку і спробуйте знову.');
-        return;
-    }
-    if (!tonConnectUI.connected) {
-        setRentBtnLoading(false, original);
-        showTopupHint(true);
-        showModalError('Гаманець не підключено', 'Підключіть гаманець у шапці і повторіть оплату.');
-        await tonConnectUI.openModal();
-        return;
-    }
-    showTopupHint(false);
-    setRentBtnLoading(true, t('sign_tx'));
-    let result;
-    try {
-        result = await tonConnectUI.sendTransaction({
-            validUntil: resp.transaction.valid_until || Math.floor(Date.now() / 1000) + 300,
-            messages: resp.transaction.messages.map(m => ({
-                address: m.address, amount: m.amount,
-                payload: m.payload || undefined,
-                stateInit: m.stateInit || undefined,
-            })),
-        });
-    } catch (e) {
-        setRentBtnLoading(false, original);
-        if (!/reject|cancel/i.test(e?.message || ''))
-            showModalError('Транзакцію відхилено', e?.message || '');
-        return;
-    }
-
-    setRentBtnLoading(true, t('confirming_net'));
-    const wallet = tonConnectUI.account?.address || null;
-    try {
-        await api(`/api/orders/${resp.order_id}/confirm`, {
-            method: 'POST',
-            body: JSON.stringify({ boc: result?.boc || null, wallet_address: wallet }),
-        });
-    } catch (e) { console.warn('confirm submit failed:', e); }
-
-    const ok = await pollOrder(resp.order_id);
-    if (ok) { closeModal(); showSuccess(g); }
-    else {
-        setRentBtnLoading(false, original);
-        notify('Транзакцію надіслано. Перевірте «Замовлення».', 'info');
-        closeModal(); setTab('orders');
+    50% {
+        fill: rgba(201, 16, 19, 0.32);
+        stroke: rgba(255, 60, 60, 0.75);
+        filter: drop-shadow(0 0 12px rgba(201, 16, 19, 0.3));
     }
 }
 
-async function payWithStars(resp, g, original) {
-    if (tg && resp.invoice_link) {
-        tg.openInvoice(resp.invoice_link, async status => {
-            if (status === 'paid') {
-                setRentBtnLoading(true, t('confirming_net'));
-                const ok = await pollOrder(resp.order_id);
-                if (ok) { closeModal(); showSuccess(g); }
-                else { setRentBtnLoading(false, original); notify('Оплату отримано — видача в процесі.', 'info'); }
-            } else {
-                setRentBtnLoading(false, original);
-                if (status !== 'cancelled') showModalError('Оплата не пройшла', '');
-            }
-        });
-    } else {
-        setRentBtnLoading(false, original);
-        showModalError('Stars недоступні', 'Відкрийте Mini App через Telegram.');
+/* Sea & water */
+.map-black-sea {
+    fill: rgba(6, 14, 28, 0.85);
+}
+.map-azov-sea {
+    fill: rgba(6, 14, 28, 0.80);
+}
+
+.map-river {
+    fill: none;
+    stroke: rgba(46,141,224,0.28);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: drop-shadow(0 0 2px rgba(46,141,224,0.15));
+}
+
+.map-water-label {
+    fill: rgba(80, 140, 200, 0.35);
+    font-family: var(--font-en);
+    font-weight: 600;
+    font-style: italic;
+    letter-spacing: 1.5px;
+}
+
+/* Cities */
+.map-city {
+    fill: #5aafff; opacity: 0.7;
+    filter: drop-shadow(0 0 4px rgba(90,175,255,0.5));
+    transition: opacity 0.2s;
+}
+.map-city:hover { opacity: 1; }
+.map-city-label {
+    fill: rgba(255,255,255,0.55);
+    font-size: 9px; font-family: var(--font-en); font-weight: 700;
+    pointer-events: none;
+    letter-spacing: 0.3px;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+}
+
+/* Threat markers */
+.map-threat { cursor: pointer; transform-box: fill-box; }
+.map-threat-glow { animation: threatPulse 1.8s infinite ease-out; }
+@keyframes threatPulse {
+    0%   { r: 10; opacity: 0.7; }
+    100% { r: 30; opacity: 0; }
+}
+.map-threat-core {
+    fill: #ff2a2e;
+    filter: drop-shadow(0 0 5px rgba(255,42,46,0.95)) drop-shadow(0 0 14px rgba(255,42,46,0.45));
+    transition: r 0.15s;
+}
+.map-threat:hover .map-threat-core { r: 7; }
+.map-threat-trail {
+    fill: none; stroke: rgba(255,60,60,0.35);
+    stroke-width: 1.5; stroke-dasharray: 4 4;
+    stroke-linecap: round;
+}
+
+/* Crimea occupied hatch overlay */
+.ua-crimea {
+    fill: rgba(16, 20, 34, 0.4);
+    stroke: rgba(100, 160, 230, 0.12);
+    stroke-width: 0.6;
+}
+.ua-crimea-hatch {
+    fill: url(#crimea-hatch);
+    opacity: 0.5;
+}
+
+/* Compass */
+.map-compass { opacity: 0.7; transition: opacity 0.2s; }
+.map-compass:hover { opacity: 1; }
+
+/* Map controls */
+.map-legend {
+    position: absolute; bottom: 8px; left: 8px; z-index: 5;
+    display: flex; gap: 8px;
+    background: rgba(0,0,0,0.72);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 9px; padding: 4px 9px;
+    font-size: 9.5px; color: var(--text-soft);
+    font-family: var(--font-en); font-weight: 600;
+}
+.map-legend span { display: flex; align-items: center; gap: 4px; }
+.ldot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+}
+.ldot.red   { background: #ff2a2e; box-shadow: 0 0 4px rgba(255,42,46,0.7); }
+.ldot.blue  { background: #3b9eff; box-shadow: 0 0 4px rgba(59,158,255,0.5); }
+.ldot.river { background: rgba(46,141,224,0.65); width: 16px; height: 2px; border-radius: 2px; }
+
+.map-zoom-reset {
+    position: absolute; top: 8px; right: 8px; z-index: 5;
+    width: 30px; height: 30px; border-radius: 9px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(0,0,0,0.72);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    color: var(--text-dim);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.18s;
+}
+.map-zoom-reset:hover { border-color: var(--accent-border); color: var(--accent-3); }
+
+.map-zoom-hint {
+    position: absolute; bottom: 8px; right: 8px; z-index: 5;
+    font-size: 8.5px; color: rgba(255,255,255,0.25);
+    font-family: var(--font-en); font-weight: 600;
+    pointer-events: none;
+}
+
+/* Threat popup */
+.threat-popup {
+    position: absolute; bottom: 36px; left: 8px; right: 8px; z-index: 6;
+    background: rgba(8,9,15,0.97);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--accent-border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px 12px 12px;
+    display: flex; gap: 10px; align-items: flex-start;
+    animation: popIn 0.22s var(--ease-out);
+    box-shadow: 0 4px 28px rgba(201,16,19,0.28), 0 0 0 1px rgba(201,16,19,0.12);
+}
+.threat-popup[hidden] { display: none; }
+@keyframes popIn {
+    from { transform: translateY(8px); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+}
+.threat-popup-close {
+    position: absolute; top: 5px; right: 8px;
+    background: transparent; border: none;
+    color: var(--text-muted); font-size: 18px; line-height: 1;
+    cursor: pointer; padding: 0 2px; transition: color 0.18s;
+}
+.threat-popup-close:hover { color: var(--text); }
+.threat-popup-icon {
+    width: 36px; height: 36px; flex-shrink: 0; border-radius: 9px;
+    background: var(--accent-dim); border: 1px solid var(--accent-border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--accent-3);
+}
+.threat-popup-content { flex: 1; min-width: 0; padding-right: 14px; }
+.threat-popup-name {
+    font-size: 13px; font-weight: 800; color: var(--text);
+    line-height: 1.2; margin-bottom: 3px; font-family: var(--font-en);
+}
+.threat-popup-route {
+    font-size: 11px; color: var(--text-muted);
+    display: flex; align-items: center; gap: 4px; margin-bottom: 5px;
+}
+.threat-popup-tags { display: flex; gap: 5px; flex-wrap: wrap; }
+.popup-tag {
+    font-size: 10px; font-weight: 700;
+    padding: 2px 7px; border-radius: 6px;
+    font-family: var(--font-en);
+}
+.popup-tag-speed   { background: var(--ton-dim); color: var(--ton-2); border: 1px solid var(--ton-border); }
+.popup-tag-status  { background: var(--accent-dim); color: var(--accent-3); border: 1px solid var(--accent-border); }
+.popup-tag-heading { background: rgba(255,255,255,0.05); color: var(--text-dim); border: 1px solid var(--border-hi); }
+
+/* ─── ALERTS STATS ───────────────────────────────────────── */
+.alerts-stats {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 8px; padding: 0 14px; margin-bottom: 16px;
+}
+.stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 8px; text-align: center;
+    transition: border-color 0.22s;
+}
+.stat-card:hover { border-color: var(--border-hi); }
+.stat-num {
+    font-size: 20px; font-weight: 800;
+    color: var(--text); line-height: 1.1;
+    font-family: var(--font-en);
+}
+.stat-num.danger { color: var(--accent-3); text-shadow: 0 0 12px var(--accent-glow2); }
+.stat-num.good   { color: var(--green); text-shadow: 0 0 12px rgba(46,204,113,0.35); }
+.stat-label {
+    font-size: 9px; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.4px;
+    margin-top: 4px; font-family: var(--font-en); font-weight: 700;
+}
+.skeleton-stat { height: 72px; }
+
+/* ─── ALERTS SECTIONS ────────────────────────────────────── */
+.alerts-section { padding: 0 14px; margin-bottom: 18px; }
+.section-hdr {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 10px;
+}
+.section-title {
+    font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.7px; color: var(--text-dim);
+    font-weight: 700; font-family: var(--font-en);
+}
+.count-chip {
+    background: var(--accent-dim); color: var(--accent-3);
+    border: 1px solid var(--accent-border);
+    border-radius: 10px; padding: 1px 8px;
+    font-size: 11px; font-weight: 700; font-family: var(--font-en);
+}
+
+/* Threat list */
+.threats-list { display: flex; flex-direction: column; gap: 8px; }
+
+.threat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    display: flex; gap: 12px; align-items: center;
+    animation: cardIn 0.36s var(--ease-out) both;
+    transition: border-color 0.2s, transform 0.15s;
+    will-change: transform; cursor: default;
+}
+.threat-card.active-threat {
+    border-color: var(--accent-border);
+    box-shadow: 0 0 18px var(--accent-dim), inset 0 0 0 1px rgba(201,16,19,0.08);
+}
+.threat-icon {
+    width: 44px; height: 44px; border-radius: 11px; flex-shrink: 0;
+    background: var(--accent-dim); border: 1px solid var(--accent-border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--accent-3);
+}
+.threat-icon.eliminated { background: var(--green-dim); border-color: rgba(46,204,113,0.28); color: var(--green); }
+.threat-icon.lost       { background: var(--orange-dim); border-color: rgba(245,158,11,0.25); color: var(--orange); }
+
+.threat-info { flex: 1; min-width: 0; }
+.threat-name {
+    font-size: 13.5px; font-weight: 700; line-height: 1.2;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-family: var(--font-en); margin-bottom: 3px;
+}
+.threat-route {
+    font-size: 11px; color: var(--text-muted);
+    display: flex; align-items: center; gap: 5px;
+}
+.threat-route-arrow { color: var(--text-faint); }
+
+.threat-right { text-align: right; flex-shrink: 0; }
+.threat-speed {
+    font-size: 11.5px; font-weight: 800; color: var(--ton-2);
+    font-family: var(--font-en); line-height: 1.1;
+}
+.threat-kind {
+    font-size: 9px; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.3px;
+    font-family: var(--font-en); font-weight: 600; margin-top: 2px;
+}
+
+.threat-skeleton, .attack-skeleton {
+    height: 72px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    position: relative; overflow: hidden;
+}
+.attack-skeleton { height: 56px; }
+.threat-skeleton::after, .attack-skeleton::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(110deg, transparent 25%, rgba(255,255,255,0.030) 50%, transparent 75%);
+    background-size: 200% 100%;
+    animation: skel 1.6s linear infinite;
+}
+
+.alerts-empty {
+    text-align: center; padding: 32px 16px;
+    color: var(--text-dim); font-size: 13px; line-height: 1.55;
+}
+
+/* Attacks */
+.attacks-list { display: flex; flex-direction: column; gap: 7px; }
+.attack-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 11px 14px;
+    display: flex; gap: 10px; align-items: center;
+    animation: cardIn 0.36s var(--ease-out) both;
+}
+.attack-date {
+    font-size: 12.5px; font-weight: 700; color: var(--text);
+    font-family: var(--font-en); flex: 1;
+}
+.attack-stats {
+    display: flex; gap: 10px; font-size: 11px;
+    font-family: var(--font-en);
+}
+.attack-stats span { display: inline-flex; align-items: center; gap: 3px; font-weight: 700; }
+.attack-stats .drones   { color: var(--ton-2); }
+.attack-stats .missiles { color: var(--accent-3); }
+.attack-stats .shot     { color: var(--green); }
+
+.alerts-disclaimer {
+    margin: 4px 14px 0;
+    padding: 11px 14px;
+    background: rgba(245,158,11,0.05);
+    border: 1px solid rgba(245,158,11,0.16);
+    border-radius: var(--radius-sm);
+    font-size: 11px; color: var(--text-dim); line-height: 1.55;
+}
+
+/* ─── MAP ZOOM / PAN ─────────────────────────────────────── */
+/* (cursor styles already in .alerts-map above) */
+
+/* ─── FILTER SHEET ───────────────────────────────────────── */
+.modal-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,0.82);
+    display: flex; align-items: flex-end; justify-content: center;
+    backdrop-filter: blur(8px) saturate(140%);
+    -webkit-backdrop-filter: blur(8px) saturate(140%);
+    animation: overlayIn 0.22s ease;
+}
+.modal-overlay[hidden] { display: none; }
+@keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+
+.bottom-sheet {
+    width: 100%; max-width: 480px;
+    background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 100%);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-top: 1px solid var(--border-hi);
+    padding: 8px 20px calc(24px + var(--safe-bottom));
+    animation: sheetUp 0.30s var(--ease-out);
+    max-height: 92dvh; overflow-y: auto;
+    overscroll-behavior: contain; position: relative;
+}
+.bottom-sheet::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.10), transparent);
+}
+@keyframes sheetUp {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+}
+.sheet-handle {
+    width: 42px; height: 4px; background: var(--surface-hi);
+    border-radius: 2px; margin: 6px auto 20px;
+}
+.sheet-hdr {
+    display: flex; align-items: center;
+    justify-content: space-between; margin-bottom: 18px;
+}
+.sheet-title { font-size: 18px; font-weight: 800; }
+.sheet-reset-btn {
+    background: transparent; border: 1px solid var(--border-hi);
+    color: var(--text-dim); border-radius: 8px;
+    padding: 5px 12px; font-family: var(--font);
+    font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.18s;
+}
+.sheet-reset-btn:hover { border-color: var(--accent-border); color: var(--accent-3); }
+
+.filter-body { display: flex; flex-direction: column; gap: 20px; margin-bottom: 16px; }
+
+.fs-sec-title {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.7px;
+    color: var(--text-muted); font-weight: 700; margin-bottom: 10px;
+    font-family: var(--font-en);
+}
+.fs-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.fs-chip {
+    padding: 6px 14px; border-radius: 22px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-btn);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    color: var(--text-dim); font-family: var(--font-en);
+    font-size: 12.5px; font-weight: 600;
+    cursor: pointer; transition: all 0.18s; white-space: nowrap;
+}
+.fs-chip.active {
+    background: var(--accent-dim); border-color: var(--accent-border);
+    color: var(--accent-3); box-shadow: 0 0 12px var(--accent-dim);
+}
+.fs-chip:hover:not(.active) { background: var(--glass-hi); color: var(--text-soft); }
+
+/* ─── CHECKOUT SHEET ─────────────────────────────────────── */
+.checkout-sheet { max-height: 94dvh; }
+
+.checkout-preview {
+    display: flex; align-items: center;
+    gap: 16px; margin-bottom: 14px;
+}
+.checkout-img-wrap {
+    flex-shrink: 0; width: 86px; height: 86px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, var(--surface-2), var(--surface-3));
+    overflow: hidden; border: 1px solid var(--border-hi);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.45);
+}
+.checkout-img { width: 100%; height: 100%; object-fit: cover; }
+.checkout-info { flex: 1; min-width: 0; }
+.checkout-name {
+    font-size: 18px; font-weight: 800; line-height: 1.2; margin-bottom: 4px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-family: var(--font-en);
+}
+.checkout-addr { font-size: 11px; color: var(--text-muted); margin-bottom: 9px; font-family: monospace; }
+.checkout-price-tag {
+    display: inline-flex; align-items: baseline; gap: 3px;
+    background: var(--ton-dim); border: 1px solid var(--ton-border);
+    border-radius: 10px; padding: 5px 12px;
+}
+.price-val { font-size: 15px; font-weight: 800; color: var(--ton-2); font-family: var(--font-en); }
+.price-unit { font-size: 11px; color: var(--text-dim); }
+
+/* NFT attrs */
+.nft-attrs { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 14px; min-height: 0; }
+.nft-attr-chip {
+    display: flex; align-items: center; gap: 4px;
+    padding: 4px 10px; background: var(--glass-btn);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--glass-border); border-radius: 20px;
+    font-size: 11px; color: var(--text-dim); white-space: nowrap;
+}
+.attr-key { color: var(--text-muted); font-size: 10px; font-family: var(--font-en); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; margin-right: 1px; }
+.attr-val { color: var(--text-soft); font-weight: 700; font-family: var(--font-en); }
+.nft-fragment-link {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px;
+    background: var(--ton-dim); border: 1px solid var(--ton-border);
+    border-radius: 20px; font-size: 11px; font-weight: 700;
+    color: var(--ton); text-decoration: none; transition: all 0.18s;
+    font-family: var(--font-en);
+}
+.nft-fragment-link:hover { background: rgba(46,141,224,0.18); box-shadow: 0 0 14px var(--ton-glow); }
+.nft-fragment-link svg { flex-shrink: 0; }
+
+.sheet-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-hi), transparent);
+    margin: 0 -20px 20px;
+}
+
+/* Duration slider */
+.duration-block { margin-bottom: 22px; }
+.duration-top {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 16px;
+}
+.duration-label { font-size: 14px; color: var(--text-dim); }
+.duration-val { font-size: 18px; font-weight: 800; }
+.slider-wrap { padding: 0 2px; margin-bottom: 8px; }
+.dur-slider {
+    width: 100%; -webkit-appearance: none; appearance: none;
+    height: 5px; border-radius: 3px; background: var(--surface-3);
+    outline: none; cursor: pointer;
+}
+.dur-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 26px; height: 26px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-2), var(--accent));
+    cursor: pointer;
+    box-shadow: 0 0 0 4px var(--accent-dim), 0 2px 18px var(--accent-glow);
+    transition: box-shadow 0.18s, transform 0.12s; will-change: transform;
+}
+.dur-slider::-webkit-slider-thumb:active {
+    box-shadow: 0 0 0 8px var(--accent-dim), 0 2px 26px var(--accent-glow);
+    transform: scale(1.15);
+}
+.dur-slider::-moz-range-thumb {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-2), var(--accent));
+    border: none; cursor: pointer; box-shadow: 0 2px 18px var(--accent-glow);
+}
+.slider-labels {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: var(--text-muted);
+}
+
+/* Totals */
+.totals-box {
+    background: linear-gradient(135deg, var(--surface-3), var(--surface-2));
+    border: 1px solid var(--border-hi);
+    border-radius: var(--radius-sm);
+    padding: 16px 18px; margin-bottom: 16px;
+    position: relative; overflow: hidden;
+}
+.totals-box::after {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-hi), transparent);
+}
+.totals-row { display: flex; justify-content: space-between; align-items: center; }
+.totals-label { font-size: 13px; color: var(--text-dim); }
+.totals-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.totals-main {
+    font-size: 24px; font-weight: 800; color: #fff; line-height: 1;
+    font-family: var(--font-en);
+}
+.totals-box.bump .totals-main { animation: bump 0.3s var(--ease-spring); }
+@keyframes bump {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.11); color: var(--ton-2); }
+    100% { transform: scale(1); }
+}
+.totals-uah { font-size: 11.5px; color: var(--text-muted); font-weight: 600; }
+.discount-row { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.discount-text { font-size: 12px; color: var(--green); font-weight: 600; }
+
+/* Payment method */
+.method-row { display: flex; gap: 8px; margin-bottom: 14px; }
+.method-btn {
+    flex: 1; padding: 12px 0;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-sm);
+    background: var(--glass-btn);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    color: var(--text-dim); font-family: var(--font);
+    font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+}
+.method-btn.active {
+    border-color: var(--accent-border);
+    background: var(--accent-dim); color: var(--text);
+    box-shadow: 0 0 20px var(--accent-dim);
+}
+.method-ic { font-size: 16px; color: var(--ton-2); }
+
+/* Top-up */
+.topup-hint {
+    background: linear-gradient(135deg, rgba(46,141,224,0.07), rgba(46,141,224,0.03));
+    border: 1px solid rgba(46,141,224,0.20);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px; margin-bottom: 14px;
+    animation: cardIn 0.3s var(--ease-out);
+}
+.topup-title { font-size: 13px; font-weight: 700; margin-bottom: 5px; color: var(--ton); }
+.topup-desc  { font-size: 12px; color: var(--text-dim); margin-bottom: 10px; line-height: 1.55; }
+.topup-addr  {
+    font-family: monospace; font-size: 10.5px; color: var(--text-soft);
+    background: rgba(0,0,0,0.3); border: 1px solid var(--border-hi);
+    border-radius: 8px; padding: 9px 12px;
+    word-break: break-all; margin-bottom: 10px;
+}
+.topup-copy {
+    width: 100%; background: var(--glass-btn);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(46,141,224,0.22); color: var(--ton);
+    border-radius: 10px; padding: 8px 14px;
+    font-family: var(--font); font-size: 12.5px; font-weight: 700;
+    cursor: pointer; transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.topup-copy:hover { background: rgba(46,141,224,0.12); border-color: rgba(46,141,224,0.40); }
+
+/* Error block */
+.checkout-error {
+    display: flex; gap: 12px; align-items: flex-start;
+    background: linear-gradient(135deg, rgba(201,16,19,0.12), rgba(201,16,19,0.04));
+    border: 1px solid var(--accent-border);
+    border-radius: var(--radius-sm);
+    padding: 13px 14px; margin-bottom: 14px;
+    animation: shake 0.44s var(--ease-out);
+    position: relative;
+}
+.checkout-error[hidden] { display: none; }
+@keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20%      { transform: translateX(-5px); }
+    40%      { transform: translateX(4px); }
+    60%      { transform: translateX(-3px); }
+    80%      { transform: translateX(2px); }
+}
+.error-icon { font-size: 20px; flex-shrink: 0; line-height: 1.25; }
+.error-body { flex: 1; min-width: 0; }
+.error-title { font-size: 13px; font-weight: 800; color: var(--accent-3); margin-bottom: 3px; }
+.error-desc  { font-size: 12px; color: var(--text-soft); line-height: 1.5; }
+.error-close {
+    background: transparent; border: none; color: var(--text-muted);
+    font-size: 20px; cursor: pointer; padding: 0 4px; line-height: 1;
+    flex-shrink: 0; transition: color 0.18s;
+}
+.error-close:hover { color: var(--text); }
+
+/* ─── PRIMARY BUTTON ─────────────────────────────────────── */
+.primary-btn {
+    width: 100%; padding: 16px;
+    background: linear-gradient(135deg, var(--accent-2) 0%, var(--accent) 55%, #750a0c 100%);
+    border: none; border-radius: var(--radius);
+    color: #fff; font-family: var(--font);
+    font-size: 16px; font-weight: 800;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    transition: opacity 0.18s, transform 0.12s, box-shadow 0.25s;
+    box-shadow: 0 4px 30px var(--accent-glow2), 0 1px 0 rgba(255,255,255,0.10) inset;
+    margin-bottom: 12px; position: relative; overflow: hidden;
+    letter-spacing: 0.2px; min-height: 54px; will-change: transform;
+}
+.primary-btn::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.14) 0%, transparent 55%);
+    pointer-events: none;
+}
+.primary-btn::before {
+    content: ''; position: absolute;
+    top: 0; bottom: 0; width: 30%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+    transform: translateX(-200%) skewX(-18deg); pointer-events: none;
+}
+.primary-btn:hover::before { transform: translateX(400%) skewX(-18deg); transition: transform 0.75s var(--ease-out); }
+.primary-btn:hover { box-shadow: 0 6px 40px var(--accent-glow); }
+.primary-btn:active { transform: scale(0.98); opacity: 0.90; }
+.primary-btn:disabled {
+    opacity: 0.48; cursor: not-allowed; transform: none;
+    background: var(--surface-hi); box-shadow: none;
+}
+.primary-btn:disabled::before,.primary-btn:disabled::after { display: none; }
+
+.btn-spinner {
+    display: none; width: 18px; height: 18px;
+    border: 2.5px solid rgba(255,255,255,0.22);
+    border-top-color: #fff; border-radius: 50%;
+    animation: spin 0.7s linear infinite; will-change: transform;
+}
+.primary-btn.loading .btn-spinner { display: inline-block; }
+
+.checkout-cta { margin-top: 4px; }
+.modal-footnote { font-size: 11px; color: var(--text-muted); text-align: center; line-height: 1.65; }
+
+/* ─── ORDERS ─────────────────────────────────────────────── */
+.orders-list { padding: 10px 14px; }
+.order-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 14px;
+    margin-bottom: 9px;
+    display: flex; gap: 12px; align-items: center;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    animation: cardIn 0.38s var(--ease-out) both;
+}
+.order-card:hover { border-color: var(--border-hi); box-shadow: 0 4px 22px rgba(0,0,0,0.35); }
+.order-img {
+    width: 58px; height: 58px; border-radius: 13px;
+    background: var(--surface-2); display: flex;
+    align-items: center; justify-content: center;
+    font-size: 26px; flex-shrink: 0;
+    border: 1px solid var(--border); overflow: hidden;
+}
+.order-img img { width: 100%; height: 100%; object-fit: cover; }
+.order-info { flex: 1; min-width: 0; }
+.order-name {
+    font-size: 14px; font-weight: 600; margin-bottom: 3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-family: var(--font-en);
+}
+.order-meta { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
+.order-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.order-price { font-size: 13px; font-weight: 700; color: var(--ton-2); }
+.order-cancel {
+    background: transparent; border: 1px solid var(--glass-border);
+    color: var(--text-dim); border-radius: 8px;
+    padding: 4px 10px; font-family: var(--font);
+    font-size: 11px; cursor: pointer; transition: all 0.18s;
+}
+.order-cancel:hover { color: var(--accent-2); border-color: var(--accent-border); }
+
+/* Badges */
+.badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 10px; font-weight: 700;
+    padding: 3px 8px; border-radius: 7px;
+    text-transform: uppercase; letter-spacing: 0.3px;
+    font-family: var(--font-en);
+}
+.badge::before { content: ''; width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.badge-fulfilled { background: var(--green-dim); color: var(--green); }
+.badge-fulfilled::before { background: var(--green); box-shadow: 0 0 5px var(--green); animation: skel 1.8s infinite; }
+.badge-confirming,.badge-submitted,.badge-awaiting_signature,.badge-paid,.badge-invoiced,.badge-created
+    { background: var(--ton-dim); color: var(--ton); }
+.badge-confirming::before,.badge-submitted::before,.badge-awaiting_signature::before,
+.badge-paid::before,.badge-invoiced::before,.badge-created::before
+    { background: var(--ton); animation: skel 1.4s infinite; }
+.badge-paid_unfulfilled { background: var(--orange-dim); color: var(--orange); }
+.badge-paid_unfulfilled::before { background: var(--orange); animation: skel 1.4s infinite; }
+.badge-failed,.badge-expired { background: var(--accent-dim); color: var(--accent-3); }
+.badge-failed::before,.badge-expired::before { background: var(--accent-2); }
+
+/* ─── SETTINGS ───────────────────────────────────────────── */
+.settings-body { padding: 16px; }
+.settings-section { margin-bottom: 20px; }
+.settings-label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.7px;
+    color: var(--text-muted); margin-bottom: 10px; font-weight: 700;
+    font-family: var(--font-en); padding: 0 2px;
+}
+
+.user-card {
+    background: linear-gradient(135deg, var(--surface-2), var(--surface-3));
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px; display: flex; align-items: center;
+    gap: 14px; margin-bottom: 20px;
+    position: relative; overflow: hidden;
+}
+.user-card::before {
+    content: ''; position: absolute; top: -50px; right: -50px;
+    width: 130px; height: 130px;
+    background: radial-gradient(circle, var(--accent-dim) 0%, transparent 70%);
+    pointer-events: none;
+}
+.user-avatar {
+    width: 54px; height: 54px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-2), #800b0d);
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 700; flex-shrink: 0;
+    box-shadow: 0 4px 22px var(--accent-glow2), 0 0 0 3px rgba(201,16,19,0.12);
+}
+.user-info { flex: 1; min-width: 0; }
+.user-name { font-size: 16px; font-weight: 700; }
+.user-uid  { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+.user-badge {
+    padding: 4px 10px;
+    background: var(--ton-dim); border: 1px solid var(--ton-border);
+    border-radius: 8px; font-size: 11px; font-weight: 700;
+    color: var(--ton); font-family: var(--font-en);
+}
+
+.settings-row {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px; transition: border-color 0.18s;
+}
+.settings-row-label { font-size: 14px; color: var(--text-soft); }
+.settings-row-val {
+    font-size: 13px; color: var(--text-dim);
+    max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.settings-action-btn {
+    width: 100%;
+    background: linear-gradient(135deg, var(--accent-2), var(--accent));
+    border: none; color: #fff;
+    padding: 14px; border-radius: var(--radius);
+    font-family: var(--font); font-size: 14px; font-weight: 700;
+    cursor: pointer; margin-top: 4px;
+    box-shadow: 0 4px 22px var(--accent-glow2);
+    transition: opacity 0.18s, transform 0.1s, box-shadow 0.2s;
+}
+.settings-action-btn:hover   { box-shadow: 0 6px 30px var(--accent-glow); }
+.settings-action-btn:active  { transform: scale(0.98); opacity: 0.88; }
+.settings-action-btn.disconnect {
+    background: transparent;
+    border: 1px solid var(--border-hi);
+    color: var(--text-dim); box-shadow: none;
+}
+.settings-action-btn.disconnect:hover { border-color: var(--accent-border); color: var(--text); }
+
+.lang-row { display: flex; gap: 8px; }
+.lang-btn {
+    flex: 1; padding: 10px 0;
+    background: var(--glass-btn);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-sm);
+    color: var(--text-dim);
+    font-family: var(--font); font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all 0.22s;
+}
+.lang-btn.active {
+    background: var(--accent-dim); border-color: var(--accent-border);
+    color: var(--accent-3); box-shadow: 0 0 16px var(--accent-dim);
+}
+.lang-btn:hover:not(.active) { background: var(--glass-hi); color: var(--text-soft); }
+
+/* ─── SUCCESS ────────────────────────────────────────────── */
+.success-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: radial-gradient(ellipse at 50% 40%, rgba(201,16,19,0.09) 0%, var(--bg) 60%);
+    display: flex; align-items: center; justify-content: center;
+    padding: 32px; animation: overlayIn 0.30s ease;
+}
+.success-overlay[hidden] { display: none; }
+.success-inner { text-align: center; max-width: 320px; }
+.success-circle {
+    margin-bottom: 24px;
+    animation: popIn 0.5s var(--ease-spring);
+    filter: drop-shadow(0 0 32px var(--accent-glow2));
+    will-change: transform;
+}
+@keyframes popIn {
+    from { transform: scale(0.4); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+}
+.success-title {
+    font-size: 30px; font-weight: 900; margin-bottom: 10px;
+    background: linear-gradient(135deg, #fff, var(--accent-3));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.success-desc { font-size: 15px; color: var(--text-dim); margin-bottom: 36px; line-height: 1.6; }
+
+/* ─── TOASTS ─────────────────────────────────────────────── */
+.toast-stack {
+    position: fixed; left: 50%;
+    bottom: calc(var(--nav-h) + var(--safe-bottom) + 14px);
+    transform: translateX(-50%);
+    z-index: 300; display: flex;
+    flex-direction: column-reverse; gap: 7px;
+    pointer-events: none;
+    width: calc(100% - 28px); max-width: 448px;
+}
+.toast {
+    pointer-events: auto;
+    background: rgba(12,13,18,0.98);
+    border: 1px solid var(--border-hi);
+    border-radius: var(--radius-sm);
+    padding: 12px 16px; color: var(--text);
+    font-size: 13px; font-weight: 500;
+    box-shadow: 0 14px 44px rgba(0,0,0,0.60);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    animation: toast-in 0.25s var(--ease-out);
+    display: flex; align-items: center; gap: 10px; will-change: transform;
+}
+.toast.success { border-color: rgba(46,204,113,0.35); }
+.toast.error   { border-color: var(--accent-border); }
+.toast-ic { font-size: 17px; flex-shrink: 0; }
+@keyframes toast-in {
+    from { transform: translateY(16px) scale(0.95); opacity: 0; }
+    to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* ╔══════════════════════════════════════════════════════════╗
+   ║  v6 — RESPONSIVE OPTIMIZATION + AMBIENT EFFECTS           ║
+   ╚══════════════════════════════════════════════════════════╝ */
+
+/* ─── Staggered card entrance (uses --i emitted by JS) ───── */
+.gift-card  { animation-delay: min(var(--i, 0) * 38ms, 460ms); }
+.stat-card  { animation: cardIn 0.4s var(--ease-out) both; }
+.stat-card:nth-child(1) { animation-delay: 0.02s; }
+.stat-card:nth-child(2) { animation-delay: 0.08s; }
+.stat-card:nth-child(3) { animation-delay: 0.14s; }
+.stat-card:nth-child(4) { animation-delay: 0.20s; }
+
+/* ─── Ambient crimson ribbon background (matches main site) ── */
+/* Moving red ribbons (canvas) — kept very transparent via JS globalAlpha. */
+#bg-canvas {
+    position: fixed; inset: 0;
+    width: 100%; height: 100%;
+    z-index: -1; pointer-events: none;
+    opacity: 0.9;
+}
+
+/* Soft red сіяння in the corners (the glow, kept subtle) */
+.glow-spot {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(140px);
+    z-index: -1; pointer-events: none;
+    opacity: 0.13;
+    mix-blend-mode: screen;
+}
+.spot-1 {
+    top: 8%; left: -22%;
+    width: 78vw; height: 78vw; max-width: 620px; max-height: 620px;
+    background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
+}
+.spot-2 {
+    bottom: 10%; right: -22%;
+    width: 78vw; height: 78vw; max-width: 620px; max-height: 620px;
+    background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
+}
+
+/* ─── Safe-area for landscape notches (left / right) ─────── */
+.r-header, .alerts-hdr { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+.bottom-nav { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+
+/* ════════════════════════════════════════════════════════════
+   BREAKPOINT: large phones / phablets / small tablets (≥ 560px)
+   ════════════════════════════════════════════════════════════ */
+@media (min-width: 560px) {
+    .view { max-width: 540px; }
+    .gifts-grid { grid-template-columns: repeat(3, 1fr); gap: 13px; }
+    .gift-card-name { font-size: 12.5px; }
+    .bottom-nav { max-width: 540px; left: 50%; right: auto; transform: translateX(-50%); border-left: 1px solid var(--border); border-right: 1px solid var(--border); border-radius: 18px 18px 0 0; }
+    .toast-stack { max-width: 508px; }
+    .map-container { margin-left: auto; margin-right: auto; max-width: 512px; }
+}
+
+/* ════════════════════════════════════════════════════════════
+   BREAKPOINT: small phones (≤ 380px) — iPhone SE, mini Androids
+   ════════════════════════════════════════════════════════════ */
+@media (max-width: 380px) {
+    :root { --nav-h: 64px; --radius: 17px; --radius-sm: 12px; }
+
+    .r-header { padding: 11px 13px 0; }
+    .r-header-top { margin-bottom: 10px; }
+    .r-brand-name { font-size: 17px; }
+
+    .gifts-grid { gap: 9px; padding: 8px 11px 6px; }
+    .gift-card-name { font-size: 11.5px; }
+    .gift-card-over { padding: 9px 8px 8px; }
+    .gift-card-days-badge, .gift-card-ton-badge { font-size: 8.5px; padding: 2px 6px; }
+
+    .r-mode-tabs { margin-bottom: 9px; }
+    .r-tab { font-size: 12.5px; }
+    .sort-chip { font-size: 11.5px; padding: 7px 12px; }
+
+    .alerts-stats { gap: 6px; padding: 0 11px; }
+    .stat-card { padding: 10px 5px; }
+    .stat-num { font-size: 17px; }
+    .stat-label { font-size: 8px; letter-spacing: 0.2px; }
+
+    .map-container { margin: 0 11px 12px; }
+    .threat-card { padding: 10px 11px; }
+    .threat-name { font-size: 12.5px; }
+
+    .nav-btn { font-size: 9px; }
+    .nav-icon svg { width: 20px; height: 20px; }
+
+    .checkout-sheet, .bottom-sheet { padding-left: 16px; padding-right: 16px; }
+    .success-title { font-size: 26px; }
+}
+
+/* ════════════════════════════════════════════════════════════
+   BREAKPOINT: very small / narrow (≤ 340px) — extra tightening
+   ════════════════════════════════════════════════════════════ */
+@media (max-width: 340px) {
+    .gifts-grid { gap: 8px; padding: 7px 9px 6px; }
+    .gift-card-name { font-size: 11px; }
+    .gift-card-ton-badge { display: none; }
+    .stat-num { font-size: 15.5px; }
+    .r-brand-name { font-size: 16px; }
+    .search-shortcut { display: none; }
+}
+
+/* ════════════════════════════════════════════════════════════
+   BREAKPOINT: landscape phones (short height) — compact chrome
+   ════════════════════════════════════════════════════════════ */
+@media (orientation: landscape) and (max-height: 500px) {
+    :root { --nav-h: 56px; }
+    .r-header { padding-top: 9px; }
+    .r-search-wrap { display: none; }
+    .map-container { aspect-ratio: auto; height: 56vh; }
+    .gifts-grid { grid-template-columns: repeat(4, 1fr); }
+    .nav-btn { flex-direction: row; gap: 6px; font-size: 11px; padding: 8px 0; }
+    .nav-icon { height: 20px; }
+    .nav-label { display: inline; }
+    .success-overlay { padding: 18px; }
+    .success-circle { margin-bottom: 12px; }
+    .success-circle svg { width: 64px; height: 64px; }
+    .success-desc { margin-bottom: 20px; }
+}
+
+/* ════════════════════════════════════════════════════════════
+   TOUCH DEVICES — neutralize sticky :hover (keep :active feel)
+   ════════════════════════════════════════════════════════════ */
+@media (hover: none) {
+    .gift-card:hover {
+        border-color: var(--border);
+        box-shadow: none;
     }
+    .gift-card:hover .gift-card-img { transform: none; filter: none; }
+    .gift-card:hover .gift-card-img-glow { opacity: 0; }
+    .gift-card:hover::after { transform: translateX(-100%); transition: none; }
+    .gift-card-rent-btn:hover::before { opacity: 0; }
+    .gift-card-rent-btn:hover { color: var(--text-soft); }
+    .stat-card:hover { border-color: var(--border); }
+    .sort-chip:hover:not(.active) { background: var(--glass-btn); border-color: var(--glass-border); color: var(--text-muted); }
+    /* Crisp tactile press on tap */
+    .gift-card:active { transform: scale(0.955); }
+    .sort-chip:active, .r-tab:active, .nav-btn:active { transform: scale(0.94); }
+    .primary-btn:active, .gift-card-rent-btn:active { transform: scale(0.97); }
 }
 
-async function pollOrder(orderId, { tries = 30, intervalMs = 3000 } = {}) {
-    for (let i = 0; i < tries; i++) {
-        try {
-            const s = await api(`/api/orders/${orderId}`);
-            if (s.status === 'fulfilled') return true;
-            if (s.status === 'failed' || s.status === 'expired') return false;
-        } catch { /* transient */ }
-        await new Promise(r => setTimeout(r, intervalMs));
+/* ════════════════════════════════════════════════════════════
+   HIGH-DPI / RETINA — sharpen 1px hairlines
+   ════════════════════════════════════════════════════════════ */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .ua-border { stroke-width: 0.9; }
+    .gift-card, .stat-card, .threat-card { border-width: 0.5px; }
+}
+
+/* ════════════════════════════════════════════════════════════
+   ACCESSIBILITY — reduced motion
+   ════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.05ms !important;
+        scroll-behavior: auto !important;
     }
-    return false;
+    .r-brand-dot, .nav-alert-dot { animation: none; }
+    .gift-card::after, .gift-card:hover::after { display: none; }
 }
 
-function resetBtn(_, text) { setRentBtnLoading(false, text); }
-
-function showSuccess(g) {
-    const isRent = state.mode === 'rent';
-    $('success-title').textContent = t(isRent ? 'success_rent' : 'success_sale');
-    $('success-desc').textContent = isRent
-        ? `"${g.name}" — ${state.duration} ${pluralDays(state.duration)}`
-        : `"${g.name}"`;
-    $('success-screen').hidden = false;
-    if (tg) { tg.HapticFeedback?.notificationOccurred('success'); tg.BackButton.hide(); }
-}
-
-function closeSuccess() {
-    $('success-screen').hidden = true;
-    loadItems(true);
-}
-
-// ─── Alerts / Air-raid map ─────────────────────────────────────────────────────
-
-const KIND_META = {
-    drone_piston:    { ua: 'Shahed / БПЛА',   en: 'Shahed / UAV',    ru: 'Shahed / БПЛА',    speed: 165 },
-    drone_jet:       { ua: 'Реактивний БПЛА',  en: 'Jet drone',       ru: 'Реактивный БПЛА', speed: 450 },
-    missile_cruise:  { ua: 'Крилата ракета',  en: 'Cruise missile',  ru: 'Крылатая ракета', speed: 800 },
-    missile_ballistic: { ua: 'Балістична ракета', en: 'Ballistic missile', ru: 'Балл. ракета', speed: 7500 },
-    bomb:            { ua: 'КАБ / Авіабомба',  en: 'Glide bomb',      ru: 'КАБ / Авиабомба',  speed: 750 },
-};
-
-const KIND_ICONS = {
-    drone_piston: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="2"/><circle cx="5" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 10V8M12 14v2M10 12H8M14 12h2"/></svg>`,
-    drone_jet:    `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2l8 16h-5l-3-6-3 6H4z"/></svg>`,
-    missile_cruise:    `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 14l13-9 5 5-9 13-2-5z"/><path d="M3 14l5 2"/></svg>`,
-    missile_ballistic: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v8M9 5l3-3 3 3M12 10c0 4 3 5 3 8a3 3 0 11-6 0c0-3 3-4 3-8z"/></svg>`,
-    bomb:         `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="13" r="6"/><path d="M17 7l3-3M14 4l3 3"/></svg>`,
-};
-
-const ZONE_LABELS = {
-    chauda:'Чауда (Крим)', crimea:'Крим', sevastopol:'Севастополь', gvardiiske:'Гвардійське',
-    black_sea_w:'Чорне море (З)', black_sea_e:'Чорне море (С)', novorossiysk:'Новоросійськ',
-    primorsk:'Приморсько-Ахтарськ', eysk:'Єйськ', rostov:'Ростов', millerovo:'Міллерово',
-    morozovsk:'Морозовськ', kursk:'Курськ', belgorod:'Бєлгород', bryansk:'Брянськ',
-    orel:'Орел', shaykivka:'Шайківка', baltimor:'Балтимор/Воронеж',
-    buturlinovka:'Бутурлинівка', engels:'Енгельс', caspian:'Каспій',
-    mozyr:'Мозир (РБ)', tot_donbas:'ТОТ Донбас', tot_zap:'ТОТ Запоріжжя',
-    unknown:'Невідомо',
-};
-
-const UA_BOUNDS = { lonMin: 22.0, lonMax: 40.5, latMin: 44.0, latMax: 52.5 };
-
-const FALLBACK_CITIES = {
-    kyiv:         { ua: 'Київ',         en: 'Kyiv',         lat: 50.45, lon: 30.52 },
-    kharkiv:      { ua: 'Харків',       en: 'Kharkiv',      lat: 49.99, lon: 36.23 },
-    odesa:        { ua: 'Одеса',        en: 'Odesa',        lat: 46.48, lon: 30.73 },
-    dnipro:       { ua: 'Дніпро',       en: 'Dnipro',       lat: 48.46, lon: 35.04 },
-    lviv:         { ua: 'Львів',        en: 'Lviv',         lat: 49.84, lon: 24.03 },
-    zaporizhzhia: { ua: 'Запоріжжя',   en: 'Zaporizhzhia', lat: 47.84, lon: 35.14 },
-    mykolaiv:     { ua: 'Миколаїв',    en: 'Mykolaiv',     lat: 46.97, lon: 32.00 },
-    kherson:      { ua: 'Херсон',      en: 'Kherson',      lat: 46.65, lon: 32.62 },
-    poltava:      { ua: 'Полтава',     en: 'Poltava',      lat: 49.59, lon: 34.55 },
-    sumy:         { ua: 'Суми',        en: 'Sumy',         lat: 50.92, lon: 34.80 },
-    chernihiv:    { ua: 'Чернігів',    en: 'Chernihiv',    lat: 51.50, lon: 31.30 },
-    vinnytsia:    { ua: 'Вінниця',     en: 'Vinnytsia',    lat: 49.23, lon: 28.47 },
-    cherkasy:     { ua: 'Черкаси',     en: 'Cherkasy',     lat: 49.45, lon: 32.06 },
-    zhytomyr:     { ua: 'Житомир',     en: 'Zhytomyr',     lat: 50.25, lon: 28.67 },
-    rivne:        { ua: 'Рівне',       en: 'Rivne',        lat: 50.62, lon: 26.25 },
-    ivano_frank:  { ua: 'Івано-Фр.',   en: 'Ivano-Fr.',    lat: 48.92, lon: 24.71 },
-    ternopil:     { ua: 'Тернопіль',   en: 'Ternopil',     lat: 49.55, lon: 25.60 },
-    lutsk:        { ua: 'Луцьк',       en: 'Lutsk',        lat: 50.74, lon: 25.32 },
-    uzhhorod:     { ua: 'Ужгород',     en: 'Uzhhorod',     lat: 48.62, lon: 22.30 },
-    kryvyi_rih:   { ua: 'Кривий Ріг',  en: 'Kryvyi Rih',   lat: 47.91, lon: 33.38 },
-    khmelnitskyi: { ua: 'Хмельницький',en: 'Khmelnytskyi', lat: 49.42, lon: 27.00 },
-};
-
-let alertsTimer = null;
-let citiesCache = null;
-
-function lonLatToXY(lon, lat) {
-    const { lonMin, lonMax, latMin, latMax } = UA_BOUNDS;
-    const x = ((lon - lonMin) / (lonMax - lonMin)) * 1000;
-    // Y inverted because SVG grows downward
-    const y = (1 - (lat - latMin) / (latMax - latMin)) * 660;
-    return { x, y };
-}
-
-// ─── Map zoom / pan ───────────────────────────────────────────────────────────
-
-let mapVB = { x: 0, y: 0, w: 1000, h: 660 };
-const MAP_MIN_W = 220;
-
-function setMapViewBox() {
-    const svg = $('alerts-map');
-    if (svg) svg.setAttribute('viewBox', `${mapVB.x} ${mapVB.y} ${mapVB.w} ${mapVB.h}`);
-}
-
-function clientToSvgCoords(svg, cx, cy) {
-    const rect = svg.getBoundingClientRect();
-    return {
-        x: mapVB.x + (cx - rect.left) * (mapVB.w / rect.width),
-        y: mapVB.y + (cy - rect.top)  * (mapVB.h / rect.height),
-    };
-}
-
-function mapZoom(scaleFactor, pivotX, pivotY) {
-    const newW = Math.max(MAP_MIN_W, Math.min(1000, mapVB.w * scaleFactor));
-    const newH = newW * (660 / 1000);
-    mapVB.x = Math.max(0, Math.min(1000 - newW, mapVB.x + (pivotX - mapVB.x) * (1 - newW / mapVB.w)));
-    mapVB.y = Math.max(0, Math.min(660  - newH, mapVB.y + (pivotY - mapVB.y) * (1 - newH / mapVB.h)));
-    mapVB.w = newW;
-    mapVB.h = newH;
-    setMapViewBox();
-}
-
-function initMapInteraction() {
-    const svg = $('alerts-map');
-    if (!svg || svg._interactionBound) return;
-    svg._interactionBound = true;
-
-    // Wheel zoom
-    svg.addEventListener('wheel', e => {
-        e.preventDefault();
-        const p = clientToSvgCoords(svg, e.clientX, e.clientY);
-        mapZoom(e.deltaY > 0 ? 1.18 : 0.85, p.x, p.y);
-    }, { passive: false });
-
-    // Touch / pointer pan + pinch
-    const ptrs = new Map();
-    let panStart = null;
-    let pinchDist0 = null;
-
-    function getPointerPair() {
-        const [a, b] = [...ptrs.values()];
-        return { cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2, dist: Math.hypot(a.x - b.x, a.y - b.y) };
+/* ════════════════════════════════════════════════════════════
+   ACCESSIBILITY — increased contrast
+   ════════════════════════════════════════════════════════════ */
+@media (prefers-contrast: more) {
+    :root {
+        --border: rgba(255,255,255,0.16);
+        --border-hi: rgba(255,255,255,0.26);
+        --text-dim: #9a9aac;
+        --text-muted: #6a6a7e;
     }
-
-    svg.addEventListener('pointerdown', e => {
-        svg.setPointerCapture(e.pointerId);
-        ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-        if (ptrs.size === 1) {
-            panStart = { cx: e.clientX, cy: e.clientY, vbX: mapVB.x, vbY: mapVB.y };
-            pinchDist0 = null;
-        } else if (ptrs.size === 2) {
-            pinchDist0 = getPointerPair().dist;
-            panStart = null;
-        }
-        svg.classList.add('dragging');
-    });
-
-    svg.addEventListener('pointermove', e => {
-        if (!ptrs.has(e.pointerId)) return;
-        ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-        if (ptrs.size === 2 && pinchDist0 !== null) {
-            const pair = getPointerPair();
-            const scale = pinchDist0 / pair.dist;
-            pinchDist0 = pair.dist;
-            const p = clientToSvgCoords(svg, pair.cx, pair.cy);
-            mapZoom(scale, p.x, p.y);
-        } else if (ptrs.size === 1 && panStart) {
-            const rect = svg.getBoundingClientRect();
-            const scaleX = mapVB.w / rect.width;
-            const scaleY = mapVB.h / rect.height;
-            const dx = (e.clientX - panStart.cx) * scaleX;
-            const dy = (e.clientY - panStart.cy) * scaleY;
-            mapVB.x = Math.max(0, Math.min(1000 - mapVB.w, panStart.vbX - dx));
-            mapVB.y = Math.max(0, Math.min(660  - mapVB.h, panStart.vbY - dy));
-            setMapViewBox();
-        }
-    });
-
-    function onPointerUp(e) {
-        ptrs.delete(e.pointerId);
-        if (ptrs.size < 2) pinchDist0 = null;
-        if (ptrs.size === 0) { panStart = null; svg.classList.remove('dragging'); }
-    }
-    svg.addEventListener('pointerup',     onPointerUp);
-    svg.addEventListener('pointercancel', onPointerUp);
+    .gift-card-name { text-shadow: 0 1px 12px #000; }
 }
 
-$('map-zoom-reset')?.addEventListener('click', () => {
-    mapVB = { x: 0, y: 0, w: 1000, h: 660 };
-    setMapViewBox();
-    if (tg) tg.HapticFeedback?.impactOccurred('light');
-});
-$('map-zoom-in')?.addEventListener('click', () => {
-    mapZoom(0.68, mapVB.x + mapVB.w / 2, mapVB.y + mapVB.h / 2);
-    if (tg) tg.HapticFeedback?.impactOccurred('light');
-});
-$('map-zoom-out')?.addEventListener('click', () => {
-    mapZoom(1.45, mapVB.x + mapVB.w / 2, mapVB.y + mapVB.h / 2);
-    if (tg) tg.HapticFeedback?.impactOccurred('light');
-});
+/* ════════════════════════════════════════════════════════════
+   FOCUS-VISIBLE — keyboard accessibility outline
+   ════════════════════════════════════════════════════════════ */
+:focus-visible {
+    outline: 2px solid var(--accent-3);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+}
+.gift-card:focus-visible { outline-offset: -2px; }
 
-// ─── Threat detail popup ──────────────────────────────────────────────────────
+/* ╔══════════════════════════════════════════════════════════╗
+   ║  v7 — PREMIUM DESIGN SYSTEM                               ║
+   ╚══════════════════════════════════════════════════════════╝ */
 
-let _threatObjects = [];
-
-function showThreatPopup(o) {
-    const meta = KIND_META[o.kind] || KIND_META.drone_piston;
-    const icon = KIND_ICONS[o.kind] || KIND_ICONS.drone_piston;
-    const kindName = meta[lang] || meta.ua;
-    const fromZone = ZONE_LABELS[o.from_zone] || o.from_zone || '?';
-    const toCity = citiesCache?.[o.to_city]?.ua || o.to_city || '?';
-    const speed = o.speed_kmh || meta.speed;
-    const heading = o.heading_deg != null ? `${o.heading_deg}°` : null;
-    const statusLabel = o.status === 'eliminated' ? '💥 Збито' : o.status === 'lost' ? '? Втрачено' : '🔴 Активний';
-
-    $('threat-popup-icon').innerHTML = icon;
-    $('threat-popup-name').textContent = o.title || kindName;
-    $('threat-popup-route').innerHTML =
-        `<span>${esc(fromZone)}</span><span style="opacity:0.5">→</span><span>${esc(toCity)}</span>`;
-    $('threat-popup-tags').innerHTML = [
-        `<span class="popup-tag popup-tag-speed">${speed} км/г</span>`,
-        `<span class="popup-tag popup-tag-status">${statusLabel}</span>`,
-        heading ? `<span class="popup-tag popup-tag-heading">↗ ${esc(heading)}</span>` : '',
-    ].join('');
-
-    $('threat-popup').hidden = false;
-    if (tg) tg.HapticFeedback?.impactOccurred('light');
+/* ── Custom scrollbars ── */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: var(--bg);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--surface-hi);
+    border-radius: 4px;
+    border: 1px solid var(--border);
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-border);
 }
 
-$('threat-popup-close')?.addEventListener('click', () => {
-    $('threat-popup').hidden = true;
-});
+/* ── Search field clear button ── */
+.search-clear-btn {
+    position: absolute; right: 46px;
+    background: transparent; border: none;
+    color: var(--text-dim); font-size: 20px; line-height: 1;
+    cursor: pointer; padding: 2px 6px; transition: color 0.18s;
+    display: flex; align-items: center; justify-content: center;
+}
+.search-clear-btn:hover { color: var(--accent-3); }
 
-async function loadCities() {
-    if (citiesCache) return citiesCache;
-    try {
-        const data = await api('/api/alerts/cities');
-        citiesCache = data.cities || {};
-    } catch {
-        citiesCache = {};
-    }
-    return citiesCache;
+/* ── Gift card: gradient border (background-clip) ─────── */
+.gift-card {
+    border: 1px solid transparent;
+    background:
+        linear-gradient(var(--surface), var(--surface)) padding-box,
+        linear-gradient(145deg,
+            rgba(244,63,94,0.25) 0%,
+            rgba(255,255,255,0.05) 45%,
+            rgba(244,63,94,0.12) 100%) border-box;
+    background-color: unset;
+}
+.gift-card:hover {
+    background:
+        linear-gradient(var(--surface), var(--surface)) padding-box,
+        linear-gradient(145deg,
+            rgba(244,63,94,0.7) 0%,
+            rgba(255,100,120,0.2) 50%,
+            rgba(244,63,94,0.45) 100%) border-box;
+    box-shadow: 0 16px 56px rgba(0,0,0,0.72), 0 0 46px var(--accent-dim);
 }
 
-async function loadAlerts() {
-    try {
-        const [current, attacks] = await Promise.all([
-            api('/api/alerts/current'),
-            api('/api/alerts/attacks?limit=5'),
-        ]);
-        await loadCities();
-        renderAlertsStatus(current);
-        renderAlertsMap(current);
-        renderAlertsStats(current, attacks);
-        renderThreatsList(current);
-        renderRecentAttacks(attacks);
-        updateNavIndicator(current);
-    } catch (e) {
-        console.warn('alerts load failed:', e);
-        $('alerts-status-title').textContent = '⚠️ ' + (lang === 'en' ? 'Unable to load' : 'Не вдалося завантажити');
-        $('alerts-status-sub').textContent = e.message || '';
-    }
+/* ── Stat cards: colored top accent per card ─────────── */
+.stat-card { padding-top: 14px; border-top-width: 2px; }
+.stat-card:nth-child(1) { border-top-color: rgba(244,63,94,0.75); }
+.stat-card:nth-child(2) { border-top-color: rgba(251,113,133,0.68); }
+.stat-card:nth-child(3) { border-top-color: rgba(245,158,11,0.68); }
+.stat-card:nth-child(4) { border-top-color: rgba(16,185,129,0.72); }
+
+/* ── Fix: JS renders .catalog-stats-filter-tag ────────── */
+.catalog-stats-filter-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--accent-dim); border: 1px solid var(--accent-border);
+    color: var(--accent-3); border-radius: 10px; padding: 2px 9px;
+    font-size: 10.5px; font-weight: 700; font-family: var(--font-en);
 }
-
-function renderAlertsStatus(current) {
-    const box = $('alerts-status');
-    const active = current?.attack?.status === 'active' && (current?.objects?.length || 0) > 0;
-    box.classList.toggle('danger', active);
-    if (active) {
-        const objCount = current.objects.length;
-        $('alerts-status-title').textContent = lang === 'en' ? '⚠ Active attack' : lang === 'ru' ? '⚠ Активная атака' : '⚠ Активна атака';
-        $('alerts-status-sub').textContent =
-            (lang === 'en' ? `${objCount} object${objCount > 1 ? 's' : ''} in the air` :
-             lang === 'ru' ? `Объектов в воздухе: ${objCount}` :
-                              `Об'єктів у повітрі: ${objCount}`);
-    } else {
-        $('alerts-status-title').textContent = lang === 'en' ? 'All calm' : lang === 'ru' ? 'Спокойно' : 'Тихо';
-        $('alerts-status-sub').textContent =
-            lang === 'en' ? 'No active threats detected' :
-            lang === 'ru' ? 'Активных угроз нет' : 'Активних загроз не зафіксовано';
-    }
+.catalog-stats-filter-tag button {
+    background: transparent; border: none; color: inherit;
+    cursor: pointer; font-size: 14px; line-height: 1; padding: 0;
+    opacity: 0.65; transition: opacity 0.14s;
 }
+.catalog-stats-filter-tag button:hover { opacity: 1; }
 
-function renderAlertsMap(current) {
-    const cityG  = $('map-cities');
-    const threatG = $('map-threats');
-
-    // Reference cities
-    if (!cityG.dataset.populated) {
-        cityG.innerHTML = Object.entries(FALLBACK_CITIES).map(([key, c]) => {
-            const { x, y } = lonLatToXY(c.lon, c.lat);
-            const name = c[lang === 'en' ? 'en' : 'ua'];
-            return `<circle class="map-city" cx="${x}" cy="${y}" r="3"/>
-                    <text class="map-city-label" x="${x + 7}" y="${y + 4}">${esc(name)}</text>`;
-        }).join('');
-        cityG.dataset.populated = '1';
-    }
-
-    // Threats
-    const threats = (current?.objects || []).filter(o => o.status === 'active' && Number.isFinite(o.lat) && Number.isFinite(o.lon));
-    _threatObjects = threats;
-    threatG.innerHTML = threats.map((o, idx) => {
-        const { x, y } = lonLatToXY(o.lon, o.lat);
-        const trail = Array.isArray(o.trail) && o.trail.length > 1
-            ? `<polyline class="map-threat-trail" points="${o.trail.map(p => {
-                const xy = lonLatToXY(p[0], p[1]); return `${xy.x},${xy.y}`;
-              }).join(' ')}"/>`
-            : '';
-        return `<g class="map-threat" data-tidx="${idx}">
-            ${trail}
-            <circle class="map-threat-glow" cx="${x}" cy="${y}" r="12" fill="url(#tGlow)"/>
-            <circle class="map-threat-core" cx="${x}" cy="${y}" r="4"/>
-        </g>`;
-    }).join('');
-
-    // Wire click on each threat marker
-    threatG.querySelectorAll('.map-threat').forEach(el => {
-        el.addEventListener('click', e => {
-            e.stopPropagation();
-            const idx = +el.dataset.tidx;
-            if (_threatObjects[idx]) showThreatPopup(_threatObjects[idx]);
-        });
-    });
-
-    initMapInteraction();
+/* ── Section titles: bigger & more visible ───────────── */
+.section-title {
+    font-size: 14px !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.1px !important;
+    text-transform: none !important;
+    color: var(--text) !important;
 }
+.section-hdr { justify-content: space-between; }
 
-function renderAlertsStats(current, attacksResp) {
-    const stats = $('alerts-stats');
-    const lastAttack = attacksResp?.attacks?.[0] || {};
-    const activeNow = (current?.objects || []).filter(o => o.status === 'active').length;
-    const items = [
-        { num: activeNow, label: lang === 'en' ? 'In air' : 'У повітрі', cls: activeNow > 0 ? 'danger' : '' },
-        { num: lastAttack.total_drones || 0,   label: lang === 'en' ? 'Drones' : 'Дронів',  cls: 'danger' },
-        { num: lastAttack.total_missiles || 0, label: lang === 'en' ? 'Missiles' : 'Ракет', cls: 'danger' },
-        { num: lastAttack.official_shot_total || 0, label: lang === 'en' ? 'Shot down' : 'Збито', cls: 'good' },
-    ];
-    stats.innerHTML = items.map(i => `
-        <div class="stat-card">
-            <div class="stat-num ${i.cls}">${i.num}</div>
-            <div class="stat-label">${esc(i.label)}</div>
-        </div>`).join('');
+/* ── Map water bodies ────────────────────────────────── */
+.map-azov-sea {
+    fill: rgba(8,28,65,0.82);
+    stroke: rgba(30,80,160,0.16);
+    stroke-width: 0.7;
 }
-
-function renderThreatsList(current) {
-    const list = $('alerts-threats-list');
-    const threats = (current?.objects || []).filter(o => o.status === 'active');
-    $('alerts-count-badge').textContent = threats.length;
-
-    if (!threats.length) {
-        list.innerHTML = `<div class="alerts-empty">${esc(t('alerts_no_threats_long'))}</div>`;
-        return;
-    }
-
-    list.innerHTML = threats.slice(0, 30).map(o => {
-        const meta = KIND_META[o.kind] || KIND_META.drone_piston;
-        const icon = KIND_ICONS[o.kind] || KIND_ICONS.drone_piston;
-        const cls  = o.status === 'eliminated' ? 'eliminated' : o.status === 'lost' ? 'lost' : '';
-        const kindName = meta[lang] || meta.ua;
-        const fromZone = ZONE_LABELS[o.from_zone] || o.from_zone || '?';
-        const toCity = citiesCache?.[o.to_city]?.ua || o.to_city || '?';
-        const speed = o.speed_kmh || meta.speed;
-        return `<div class="threat-card active-threat">
-            <div class="threat-icon ${cls}">${icon}</div>
-            <div class="threat-info">
-                <div class="threat-name">${esc(o.title || kindName)}</div>
-                <div class="threat-route">
-                    <span>${esc(fromZone)}</span>
-                    <span class="threat-route-arrow">→</span>
-                    <span>${esc(toCity)}</span>
-                </div>
-            </div>
-            <div class="threat-right">
-                <div class="threat-speed">${speed} км/г</div>
-                <div class="threat-kind">${esc(kindName.split(' ')[0])}</div>
-            </div>
-        </div>`;
-    }).join('');
+.map-black-sea {
+    fill: rgba(5,18,45,0.72);
+    stroke: rgba(20,60,130,0.12);
+    stroke-width: 0.5;
 }
-
-function renderRecentAttacks(attacksResp) {
-    const list = $('alerts-attacks-list');
-    const attacks = (attacksResp?.attacks || []).slice(0, 5);
-    if (!attacks.length) {
-        list.innerHTML = `<div class="alerts-empty">—</div>`;
-        return;
-    }
-    list.innerHTML = attacks.map(a => {
-        const d = new Date(a.started_at * 1000);
-        const dateStr = d.toLocaleDateString(lang === 'en' ? 'en-GB' : 'uk-UA', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-        return `<div class="attack-card">
-            <div class="attack-date">${esc(dateStr)}</div>
-            <div class="attack-stats">
-                <span class="drones">◈ ${a.total_drones || 0}</span>
-                <span class="missiles">⚡ ${a.total_missiles || 0}</span>
-                <span class="shot">✓ ${a.official_shot_total || 0}</span>
-            </div>
-        </div>`;
-    }).join('');
+.ua-crimea {
+    fill: rgba(20,30,48,0.90);
+    stroke: rgba(110,140,210,0.32);
+    stroke-width: 1.0;
+    stroke-dasharray: 5.5 3;
 }
-
-function updateNavIndicator(current) {
-    const active = current?.attack?.status === 'active' && (current?.objects?.length || 0) > 0;
-    const ind = $('nav-alert-indicator');
-    if (ind) ind.hidden = !active;
+.ua-crimea-hatch {
+    fill: url(#crimea-hatch);
+    opacity: 0.11;
 }
-
-function startAlertsAutoRefresh() {
-    stopAlertsAutoRefresh();
-    alertsTimer = setInterval(loadAlerts, 30_000);
+.map-grid-overlay {
+    fill: url(#ua-grid);
 }
-function stopAlertsAutoRefresh() {
-    if (alertsTimer) clearInterval(alertsTimer);
-    alertsTimer = null;
+.map-water-label {
+    fill: rgba(65,115,195,0.28);
+    font-style: italic; font-weight: 600;
+    font-family: var(--font-en); letter-spacing: 0.6px;
+    pointer-events: none;
 }
+.map-compass { pointer-events: none; }
 
-$('alerts-refresh-btn')?.addEventListener('click', () => {
-    $('alerts-refresh-btn').classList.add('spin');
-    loadAlerts().finally(() => setTimeout(() => $('alerts-refresh-btn').classList.remove('spin'), 700));
-    if (tg) tg.HapticFeedback?.impactOccurred('light');
-});
-
-// Background ping every 60s to keep indicator fresh even outside alerts tab
-setInterval(async () => {
-    if (state.tab === 'alerts') return; // already auto-refreshing
-    try {
-        const c = await api('/api/alerts/current');
-        updateNavIndicator(c);
-    } catch { /* silent */ }
-}, 60_000);
-
-// ─── Orders ───────────────────────────────────────────────────────────────────
-
-const STATUS_LABEL = {
-    created:'створено', awaiting_signature:'очікує підпису',
-    invoiced:'очікує оплати', submitted:'надіслано',
-    confirming:'підтвердження', paid:'оплачено',
-    fulfilled:'виконано', paid_unfulfilled:'оплачено · вручну',
-    failed:'скасовано', expired:'прострочено',
-};
-
-async function loadOrders() {
-    const list = $('orders-list');
-    list.innerHTML = Array(3).fill('<div class="gift-skeleton wide"></div>').join('');
-    try {
-        const qs = state.ordersKind ? `?kind=${state.ordersKind}` : '';
-        const orders = await api(`/api/orders${qs}`);
-        if (!orders.length) {
-            list.innerHTML = stateCell('📭', 'Замовлень поки немає', 'Замовляйте в «Каталозі»');
-            return;
-        }
-        list.innerHTML = orders.map(orderCard).join('');
-        list.querySelectorAll('.order-cancel-btn').forEach(b =>
-            b.addEventListener('click', () => cancelOrder(+b.dataset.id)));
-    } catch (e) { list.innerHTML = stateCell('⚠️', 'Помилка', e.message, false); }
+/* ── Zoom +/− buttons ────────────────────────────────── */
+.map-zoom-btns {
+    position: absolute; top: 8px; right: 8px; z-index: 5;
+    display: flex; flex-direction: column; gap: 3px;
 }
-
-function orderCard(o) {
-    const dur = o.kind === 'rent' && o.duration_days ? ` · ${o.duration_days} ${pluralDays(o.duration_days)}` : '';
-    const cancelBtn = o.can_cancel
-        ? `<button class="order-cancel-btn" data-id="${o.order_id}">скасувати</button>` : '';
-    const imgContent = o.image_url
-        ? `<img src="${esc(o.image_url)}" alt="" loading="lazy">`
-        : (o.kind === 'rent' ? '🎁' : '🛒');
-    const uahPrice = o.currency !== 'XTR'
-        ? `<span style="font-size:11px;color:var(--text-muted);margin-left:3px">≈${tonToUah(o.our_price)}</span>` : '';
-    return `
-    <div class="order-card">
-        <div class="order-img">${imgContent}</div>
-        <div class="order-info">
-            <div class="order-name">${esc(o.nft_name || 'Gift')}</div>
-            <div class="order-meta">${esc(o.kind === 'rent' ? t('rent') : t('sale'))}${dur} · ${esc(truncAddr(o.nft_address))}</div>
-            <div class="order-bottom">
-                <span class="badge badge-${esc(o.status)}">${STATUS_LABEL[o.status] || o.status}</span>
-                <div style="display:flex;align-items:center;gap:4px">
-                    <span class="order-price">◈ ${o.our_price}${o.currency === 'XTR' ? ' ⭐' : ''}</span>
-                    ${uahPrice}${cancelBtn}
-                </div>
-            </div>
-        </div>
-    </div>`;
+.map-zoom-btn {
+    width: 30px; height: 30px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.11);
+    background: rgba(4,5,10,0.82);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    color: rgba(255,255,255,0.55); font-size: 20px; font-weight: 200;
+    line-height: 1; font-family: var(--font-en);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.16s; user-select: none;
 }
+.map-zoom-btn:hover { border-color: var(--accent-border); color: var(--accent-3); background: rgba(244,63,94,0.10); }
+.map-zoom-btn:active { transform: scale(0.88); }
+/* Push reset below the two zoom buttons */
+.map-zoom-reset { top: 76px; }
 
-async function cancelOrder(id) {
-    try {
-        await api(`/api/orders/${id}/cancel`, { method: 'POST' });
-        notify('Замовлення скасовано', 'success');
-        loadOrders();
-    } catch (e) { notify(e.message, 'error'); }
+/* ── Filter sheet ────────────────────────────────────── */
+.fs-section-title {
+    font-size: 11px; font-weight: 700; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 10px;
 }
-
-// ─── Settings ─────────────────────────────────────────────────────────────────
-
-async function loadSettings() {
-    const user = tg?.initDataUnsafe?.user;
-    if (user) {
-        $('user-name').textContent = user.first_name + (user.last_name ? ` ${user.last_name}` : '');
-        $('user-uid').textContent  = user.username ? `@${user.username}` : `id ${user.id}`;
-        $('user-avatar').textContent = (user.first_name || '?').charAt(0).toUpperCase();
-    }
-    refreshWalletUi();
-    try {
-        const h = await api('/health');
-        $('net-info').textContent    = h.network === 'testnet' ? 'TON Testnet' : 'TON Mainnet';
-        $('markup-info').textContent = `~${h.markup_percent}%`;
-    } catch { /* ignore */ }
+.fs-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.fs-chip {
+    padding: 7px 16px; border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-btn);
+    color: var(--text-muted); font-family: var(--font);
+    font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.18s;
 }
-
-function refreshWalletUi() {
-    const btn = $('wallet-action-btn');
-    const status = $('wallet-status');
-    if (tonConnectUI?.connected) {
-        const addr = tonConnectUI.account?.address;
-        status.textContent = truncAddr(addr);
-        status.style.color = 'var(--green)';
-        btn.textContent = t('disconnect_wallet');
-        btn.classList.add('disconnect');
-    } else {
-        status.textContent = 'не підключено';
-        status.style.color = '';
-        btn.textContent = t('connect_wallet');
-        btn.classList.remove('disconnect');
-    }
+.fs-chip.active {
+    background: var(--accent-dim); border-color: var(--accent-border); color: var(--accent-3);
 }
+.fs-chip:hover:not(.active) { border-color: var(--border-hi); color: var(--text-soft); }
 
-async function toggleWallet() {
-    if (!tonConnectUI) return notify('TonConnect недоступний', 'error');
-    if (tonConnectUI.connected) await tonConnectUI.disconnect();
-    else                        await tonConnectUI.openModal();
+/* ── Orders page ─────────────────────────────────────── */
+.order-card {
+    display: flex; gap: 13px; align-items: center;
+    background: var(--surface);
+    border: 1px solid transparent;
+    background-image:
+        linear-gradient(var(--surface), var(--surface)),
+        linear-gradient(135deg, rgba(255,255,255,0.055), rgba(201,16,19,0.09));
+    background-clip: padding-box, border-box;
+    background-origin: padding-box, border-box;
+    border-radius: var(--radius-sm); padding: 13px 14px;
+    margin: 0 14px 10px;
+    transition: box-shadow 0.22s;
 }
-
-// ─── Tabs ──────────────────────────────────────────────────────────────────────
-
-function setTab(tab) {
-    state.tab = tab;
-    document.body.dataset.tab = tab;
-    $$('.view').forEach(v => v.classList.toggle('hidden', v.dataset.view !== tab));
-    $$('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-
-    if (tab === 'catalog') { headerHidden = false; $('catalog-header')?.classList.remove('hide-scroll'); }
-    if (tab === 'orders')   loadOrders();
-    if (tab === 'settings') loadSettings();
-    if (tab === 'alerts')   { loadAlerts(); startAlertsAutoRefresh(); }
-    else                    stopAlertsAutoRefresh();
-    if (tg) tg.HapticFeedback?.selectionChanged();
+.order-card:hover { box-shadow: 0 0 0 1px var(--accent-border), 0 8px 32px rgba(0,0,0,0.5); }
+.order-img {
+    width: 56px; height: 56px; flex-shrink: 0; border-radius: 11px;
+    overflow: hidden; background: var(--surface-3);
+    display: flex; align-items: center; justify-content: center; font-size: 24px;
 }
-
-function setMode(mode) {
-    state.mode = mode;
-    state.sort = mode === 'rent' ? 'popular' : 'price_asc';
-    $$('.r-mode-tabs [data-mode]').forEach(tab => tab.classList.toggle('active', tab.dataset.mode === mode));
-    $$('.rent-only').forEach(e => e.style.display = mode === 'rent' ? '' : 'none');
-    $$('.sort-chip').forEach(c => c.classList.toggle('active', c.dataset.sort === state.sort));
-    loadItems(true);
+.order-img img { width: 100%; height: 100%; object-fit: cover; }
+.order-info { flex: 1; min-width: 0; }
+.order-name {
+    font-size: 14px; font-weight: 700; line-height: 1.3;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px;
 }
+.order-meta { font-size: 11px; color: var(--text-muted); margin-bottom: 7px; }
+.order-bottom { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 5px; }
+.badge {
+    font-size: 9.5px; font-weight: 800; font-family: var(--font-en);
+    padding: 2px 8px; border-radius: 7px; letter-spacing: 0.2px;
+}
+.badge-fulfilled  { background: rgba(46,204,113,0.12); color: var(--green); border: 1px solid rgba(46,204,113,0.25); }
+.badge-created,.badge-awaiting_signature,.badge-invoiced { background: var(--ton-dim); color: var(--ton-2); border: 1px solid var(--ton-border); }
+.badge-submitted,.badge-confirming,.badge-paid { background: rgba(245,158,11,0.10); color: var(--orange); border: 1px solid rgba(245,158,11,0.22); }
+.badge-failed,.badge-expired { background: var(--accent-dim); color: var(--accent-3); border: 1px solid var(--accent-border); }
+.badge-paid_unfulfilled { background: rgba(245,158,11,0.10); color: var(--orange); border: 1px solid rgba(245,158,11,0.22); }
+.order-price { font-size: 13px; font-weight: 800; color: var(--ton-2); font-family: var(--font-en); }
+.order-cancel-btn {
+    font-size: 11px; color: var(--text-muted); font-family: var(--font);
+    background: transparent; border: 1px solid var(--border-hi);
+    border-radius: 7px; padding: 4px 10px; cursor: pointer; font-weight: 600; transition: all 0.18s;
+}
+.order-cancel-btn:hover { color: var(--accent-3); border-color: var(--accent-border); }
+.orders-list { padding-top: 8px; }
 
-// ─── Wire-up ──────────────────────────────────────────────────────────────────
-
-$('rental-modal').addEventListener('click', e => { if (e.target === $('rental-modal')) closeModal(); });
-
-$('duration-slider').addEventListener('input', e => {
-    state.duration = parseInt(e.target.value, 10);
-    updateSliderFill(e.target);
-    refreshTotals();
-    if (tg) tg.HapticFeedback?.selectionChanged();
-});
-
-$('rent-btn').addEventListener('click', checkout);
-$('success-btn').addEventListener('click', closeSuccess);
-$('load-more-btn').addEventListener('click', () => loadItems(false));
-$('wallet-action-btn').addEventListener('click', toggleWallet);
-$('modal-error-close')?.addEventListener('click', hideModalError);
-
-$('topup-copy-btn').addEventListener('click', () => {
-    if (!MERCHANT_WALLET) return;
-    navigator.clipboard?.writeText(MERCHANT_WALLET).then(() => {
-        notify('Адресу скопійовано', 'success');
-        if (tg) tg.HapticFeedback?.notificationOccurred('success');
-    }).catch(() => {
-        const el = document.createElement('input');
-        el.value = MERCHANT_WALLET; document.body.appendChild(el);
-        el.select(); document.execCommand('copy'); document.body.removeChild(el);
-        notify('Адресу скопійовано', 'success');
-    });
-});
-
-$$('.r-mode-tabs [data-mode]').forEach(tab =>
-    tab.addEventListener('click', () => setMode(tab.dataset.mode)));
-
-$$('.sort-chip').forEach(chip =>
-    chip.addEventListener('click', () => {
-        $$('.sort-chip').forEach(c => c.classList.remove('active'));
-        chip.classList.add('active');
-        state.sort = chip.dataset.sort;
-        loadItems(true);
-        if (tg) tg.HapticFeedback?.selectionChanged();
-    }));
-
-$$('.method-btn').forEach(b =>
-    b.addEventListener('click', () => {
-        $$('.method-btn').forEach(x => x.classList.remove('active'));
-        b.classList.add('active');
-        state.method = b.dataset.method;
-        if (tg) tg.HapticFeedback?.selectionChanged();
-    }));
-
-$$('.nav-btn').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
-
-$$('#orders-filter [data-kind]').forEach(tab =>
-    tab.addEventListener('click', () => {
-        $$('#orders-filter .r-tab').forEach(x => x.classList.remove('active'));
-        tab.classList.add('active');
-        state.ordersKind = tab.dataset.kind;
-        loadOrders();
-    }));
-
-$$('.lang-btn').forEach(btn =>
-    btn.addEventListener('click', () => {
-        lang = btn.dataset.lang;
-        localStorage.setItem('gm_lang', lang);
-        applyLang();
-        if (tg) tg.HapticFeedback?.selectionChanged();
-    }));
-
-let searchTimer;
-$('search-input').addEventListener('input', e => {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => { state.query = e.target.value; renderGrid(); }, 150);
-});
-
-// ─── Init ─────────────────────────────────────────────────────────────────────
-
-applyLang();
-loadItems(true);
-
-// Prime alert indicator at startup
-api('/api/alerts/current').then(updateNavIndicator).catch(() => {});
+/* ── Settings page ───────────────────────────────────── */
+.settings-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 14px; }
+.user-card {
+    display: flex; align-items: center; gap: 14px;
+    background: linear-gradient(135deg, var(--surface-2), var(--surface));
+    border: 1px solid var(--border-hi); border-radius: var(--radius); padding: 16px 18px;
+}
+.user-avatar {
+    width: 54px; height: 54px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-2), #880b0d);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 23px; font-weight: 800; color: #fff; flex-shrink: 0;
+    box-shadow: 0 4px 20px var(--accent-glow2);
+}
+.user-info { flex: 1; min-width: 0; }
+.user-name { font-size: 16px; font-weight: 800; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-uid  { font-size: 12px; color: var(--text-muted); }
+.user-badge {
+    font-size: 10px; font-weight: 800; font-family: var(--font-en);
+    background: var(--ton-dim); border: 1px solid var(--ton-border);
+    color: var(--ton-2); border-radius: 8px; padding: 3px 9px;
+}
+.settings-section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+}
+.settings-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; padding: 12px 16px 4px; }
+.settings-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 16px; border-bottom: 1px solid var(--border); }
+.settings-row:last-of-type { border-bottom: none; }
+.settings-row-label { font-size: 13px; color: var(--text-dim); }
+.settings-row-val { font-size: 13px; font-weight: 600; font-family: var(--font-en); }
